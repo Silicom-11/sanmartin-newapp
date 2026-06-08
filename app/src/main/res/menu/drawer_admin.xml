@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <group android:checkableBehavior="single">
+        <item android:id="@+id/drawer_dashboard" android:title="@string/nav_home"
+            android:icon="@android:drawable/ic_menu_today" />
+        <item android:id="@+id/drawer_students" android:title="@string/nav_students"
+            android:icon="@android:drawable/ic_menu_my_calendar" />
+        <item android:id="@+id/drawer_teachers" android:title="@string/nav_teachers"
+            android:icon="@android:drawable/ic_menu_myplaces" />
+        <item android:id="@+id/drawer_parents" android:title="@string/nav_parents"
+            android:icon="@android:drawable/ic_menu_myplaces" />
+        <item android:id="@+id/drawer_courses" android:title="@string/nav_courses"
+            android:icon="@android:drawable/ic_menu_sort_by_size" />
+    </group>
+    <group android:id="@+id/group_academic" android:checkableBehavior="single">
+        <item android:id="@+id/drawer_grades" android:title="@string/nav_grades"
+            android:icon="@android:drawable/ic_menu_edit" />
+        <item android:id="@+id/drawer_attendance" android:title="@string/nav_attendance"
+            android:icon="@android:drawable/ic_menu_agenda" />
+        <item android:id="@+id/drawer_justifications" android:title="@string/nav_justifications"
+            android:icon="@android:drawable/ic_menu_info_details" />
+        <item android:id="@+id/drawer_gps" android:title="@string/nav_gps"
+            android:icon="@android:drawable/ic_menu_mapmode" />
+    </group>
+    <group android:id="@+id/group_system" android:checkableBehavior="single">
+        <item android:id="@+id/drawer_reports" android:title="@string/nav_reports"
+            android:icon="@android:drawable/ic_menu_report_image" />
+        <item android:id="@+id/drawer_notifications" android:title="@string/nav_notifications"
+            android:icon="@android:drawable/ic_popup_reminder" />
+        <item android:id="@+id/drawer_settings" android:title="@string/nav_settings"
+            android:icon="@android:drawable/ic_menu_preferences" />
+    </group>
+    <group android:id="@+id/group_account">
+        <item android:id="@+id/drawer_logout" android:title="@string/logout"
+            android:icon="@android:drawable/ic_menu_close_clear_cancel" />
+    </group>
+</menu>

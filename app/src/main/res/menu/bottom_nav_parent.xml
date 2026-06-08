@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:id="@+id/nav_home" android:title="@string/nav_home"
+        android:icon="@drawable/ic_dashboard" />
+    <item android:id="@+id/nav_grades" android:title="@string/nav_grades"
+        android:icon="@drawable/ic_grades" />
+    <item android:id="@+id/nav_gps" android:title="@string/nav_gps"
+        android:icon="@drawable/ic_location" />
+    <item android:id="@+id/nav_justifications" android:title="@string/nav_justify"
+        android:icon="@drawable/ic_justification" />
+    <item android:id="@+id/nav_profile" android:title="@string/nav_profile"
+        android:icon="@drawable/ic_profile" />
+</menu>

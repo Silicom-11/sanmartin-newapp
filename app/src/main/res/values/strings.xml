@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">IEP Continental Americano</string>
+    <string name="google_maps_key">YOUR_GOOGLE_MAPS_API_KEY</string>
+
+    <!-- Auth -->
+    <string name="login_title">Iniciar Sesión</string>
+    <string name="email_hint">Correo electrónico</string>
+    <string name="password_hint">Contraseña</string>
+    <string name="login_button">Ingresar</string>
+    <string name="register_link">¿No tienes cuenta? Regístrate</string>
+    <string name="forgot_password_link">¿Olvidaste tu contraseña?</string>
+    <string name="register_title">Crear Cuenta</string>
+    <string name="first_name_hint">Nombres</string>
+    <string name="last_name_hint">Apellidos</string>
+    <string name="phone_hint">Teléfono</string>
+    <string name="dni_hint">DNI</string>
+    <string name="confirm_password_hint">Confirmar contraseña</string>
+    <string name="register_button">Registrarse</string>
+    <string name="login_link">¿Ya tienes cuenta? Inicia sesión</string>
+    <string name="forgot_title">Recuperar Contraseña</string>
+    <string name="send_reset_button">Enviar enlace</string>
+
+    <!-- Navigation -->
+    <string name="nav_home">Inicio</string>
+    <string name="nav_calendar">Calendario</string>
+    <string name="nav_messages">Comunicados</string>
+    <string name="nav_communications">Comunicados</string>
+    <string name="nav_profile">Perfil</string>
+    <string name="nav_students">Estudiantes</string>
+    <string name="nav_teachers">Docentes</string>
+    <string name="nav_parents">Padres</string>
+    <string name="nav_courses">Cursos</string>
+    <string name="nav_grades">Calificaciones</string>
+    <string name="nav_attendance">Asistencia</string>
+    <string name="nav_justifications">Justificaciones</string>
+    <string name="nav_gps">GPS</string>
+    <string name="nav_justify">Justificar</string>
+    <string name="nav_reports">Reportes</string>
+    <string name="nav_settings">Configuración</string>
+    <string name="nav_notifications">Notificaciones</string>
+    <string name="nav_enrollment">Matrícula</string>
+
+    <!-- Common -->
+    <string name="loading">Cargando...</string>
+    <string name="error_generic">Ocurrió un error. Intente nuevamente.</string>
+    <string name="save">Guardar</string>
+    <string name="cancel">Cancelar</string>
+    <string name="delete">Eliminar</string>
+    <string name="edit">Editar</string>
+    <string name="search">Buscar</string>
+    <string name="confirm">Confirmar</string>
+    <string name="yes">Sí</string>
+    <string name="no">No</string>
+    <string name="logout">Cerrar Sesión</string>
+    <string name="retry">Reintentar</string>
+    <string name="no_data">No hay datos disponibles</string>
+    <string name="success">Operación exitosa</string>
+
+    <!-- Roles -->
+    <string name="role_admin">Administrativo</string>
+    <string name="role_teacher">Docente</string>
+    <string name="role_parent">Padre de Familia</string>
+    <string name="role_student">Estudiante</string>
+</resources>

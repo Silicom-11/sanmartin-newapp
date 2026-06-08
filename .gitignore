@@ -1,0 +1,31 @@
+# Gradle / Android build outputs
+.gradle/
+build/
+app/build/
+captures/
+
+# Local machine configuration
+local.properties
+.idea/
+.vscode/
+
+# Release artifacts and signing material
+*.apk
+*.aab
+*.jks
+*.keystore
+*.p12
+
+# Firebase / environment files
+google-services.json
+*.env
+
+# Logs and generated scratch files
+*.log
+window.xml
+*.tmp
+
+# Local scaffolding helpers used during migration, not part of the production app
+scaffold_project.py
+generate_fragments.py
+generate_phase2a.py

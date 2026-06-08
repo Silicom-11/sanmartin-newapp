@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Primary: institutional navy/blue -->
+    <color name="primary">#173B70</color>
+    <color name="primary_dark">#0B2346</color>
+    <color name="primary_light">#EAF2FF</color>
+    <color name="primary_variant">#1B56A5</color>
+
+    <!-- Secondary: Amber/Orange accent -->
+    <color name="secondary">#FFC31A</color>
+    <color name="secondary_dark">#D99A00</color>
+    <color name="secondary_light">#FFF4C6</color>
+
+    <!-- Surface/Background -->
+    <color name="background">#F6F8FC</color>
+    <color name="surface">#FFFFFF</color>
+    <color name="surface_variant">#EEF4FC</color>
+
+    <!-- Text -->
+    <color name="text_primary">#212121</color>
+    <color name="text_secondary">#757575</color>
+    <color name="text_on_primary">#FFFFFF</color>
+    <color name="text_on_secondary">#FFFFFF</color>
+    <color name="text_hint">#BDBDBD</color>
+
+    <!-- Status Colors -->
+    <color name="success">#4CAF50</color>
+    <color name="success_light">#E8F5E9</color>
+    <color name="warning">#FF9800</color>
+    <color name="warning_light">#FFF3E0</color>
+    <color name="error">#F44336</color>
+    <color name="error_light">#FFEBEE</color>
+    <color name="info">#2196F3</color>
+    <color name="info_light">#E3F2FD</color>
+
+    <!-- Attendance Status -->
+    <color name="status_present">#4CAF50</color>
+    <color name="status_absent">#F44336</color>
+    <color name="status_late">#FF9800</color>
+    <color name="status_justified">#2196F3</color>
+
+    <!-- Grade Scale (AD/A/B/C) -->
+    <color name="grade_ad">#1B5E20</color>
+    <color name="grade_a">#4CAF50</color>
+    <color name="grade_b">#FF9800</color>
+    <color name="grade_c">#F44336</color>
+
+    <!-- Risk Semaphore -->
+    <color name="risk_green">#4CAF50</color>
+    <color name="risk_yellow">#FFEB3B</color>
+    <color name="risk_red">#F44336</color>
+    <color name="risk_low">#4CAF50</color>
+    <color name="risk_medium">#FFEB3B</color>
+    <color name="risk_high">#F44336</color>
+
+    <!-- Misc -->
+    <color name="divider">#E0E0E0</color>
+    <color name="ripple">#20000000</color>
+    <color name="overlay">#80000000</color>
+    <color name="white">#FFFFFF</color>
+    <color name="black">#000000</color>
+    <color name="ink">#111827</color>
+    <color name="navy_soft">#264C83</color>
+    <color name="gold_soft">#FFF7DB</color>
+    <color name="card_stroke">#D9E2EF</color>
+    <color name="muted_blue">#617A9F</color>
+</resources>
