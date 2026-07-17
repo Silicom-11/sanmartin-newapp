@@ -16,10 +16,28 @@ android {
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
 
-    buildTypes {
+    signingConfigs {
         release {
-            minifyEnabled false
+            storeFile file('../keystore/iepca-release.jks')
+            storePassword System.getenv("KEYSTORE_PASSWORD") ?: "iepca2026release"
+            keyAlias "iepca-key"
+            keyPassword System.getenv("KEY_PASSWORD") ?: "iepca2026release"
+        }
+    }
+
+    buildTypes {
+        debug {
+            versionNameSuffix "-debug"
+            debuggable true
+            // Local backend through "adb reverse tcp:5000 tcp:5000"
+            buildConfigField "String", "API_BASE_URL", '"http://127.0.0.1:5000/api/"'
+        }
+        release {
+            signingConfig signingConfigs.release
+            minifyEnabled true
+            shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            buildConfigField "String", "API_BASE_URL", '"https://sancontinentalapp-backend.onrender.com/api/"'
         }
     }
 
@@ -30,6 +48,7 @@ android {
 
     buildFeatures {
         viewBinding true
+        buildConfig true
     }
 }
 
@@ -72,7 +91,8 @@ dependencies {
     annotationProcessor 'com.github.bumptech.glide:compiler:4.16.0'
 
     // Google Maps & Location
-    implementation 'com.google.android.gms:play-services-maps:18.2.0'
+    // OpenStreetMap (no API key required) for GPS map screens
+    implementation 'org.osmdroid:osmdroid-android:6.1.18'
     implementation 'com.google.android.gms:play-services-location:21.0.1'
 
     // Firebase (Push Notifications)

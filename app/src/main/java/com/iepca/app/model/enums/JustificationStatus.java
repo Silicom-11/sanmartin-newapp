@@ -2,12 +2,23 @@ package com.iepca.app.model.enums;
 
 import com.google.gson.annotations.SerializedName;
 
+/**
+ * Justification status. Wire values match the backend (English);
+ * {@link #getLabel()} returns the Spanish text shown in the UI.
+ */
 public enum JustificationStatus {
-    @SerializedName("pendiente") PENDIENTE("pendiente"),
-    @SerializedName("aprobada") APROBADA("aprobada"),
-    @SerializedName("rechazada") RECHAZADA("rechazada");
+    @SerializedName("pending") PENDING("pending", "Pendiente"),
+    @SerializedName("approved") APPROVED("approved", "Aprobada"),
+    @SerializedName("rejected") REJECTED("rejected", "Rechazada");
 
     private final String value;
-    JustificationStatus(String value) { this.value = value; }
+    private final String label;
+
+    JustificationStatus(String value, String label) {
+        this.value = value;
+        this.label = label;
+    }
+
     public String getValue() { return value; }
+    public String getLabel() { return label; }
 }

@@ -3,7 +3,7 @@ package com.iepca.app.model;
 import com.google.gson.annotations.SerializedName;
 
 public class Notification {
-    @SerializedName("_id") private String id;
+    @SerializedName(value = "_id", alternate = {"id"}) private String id;
     private String recipientId;
     private String title;
     private String message;

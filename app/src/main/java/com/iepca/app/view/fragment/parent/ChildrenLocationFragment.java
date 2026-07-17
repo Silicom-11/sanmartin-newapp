@@ -1,5 +1,6 @@
 package com.iepca.app.view.fragment.parent;
 
+import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -11,15 +12,10 @@ import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.content.ContextCompat;
+import androidx.core.graphics.drawable.DrawableCompat;
 import androidx.fragment.app.Fragment;
 
-import com.google.android.gms.maps.CameraUpdateFactory;
-import com.google.android.gms.maps.GoogleMap;
-import com.google.android.gms.maps.OnMapReadyCallback;
-import com.google.android.gms.maps.SupportMapFragment;
-import com.google.android.gms.maps.model.BitmapDescriptorFactory;
-import com.google.android.gms.maps.model.LatLng;
-import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.material.button.MaterialButton;
 import com.iepca.app.R;
 import com.iepca.app.config.RetrofitClient;
@@ -30,6 +26,10 @@ import com.iepca.app.model.Location;
 import com.iepca.app.model.Student;
 import com.iepca.app.util.UIUtils;
 
+import org.osmdroid.util.GeoPoint;
+import org.osmdroid.views.MapView;
+import org.osmdroid.views.overlay.Marker;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -38,9 +38,13 @@ import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 
-public class ChildrenLocationFragment extends Fragment implements OnMapReadyCallback {
+/**
+ * Parent view of their children's live GPS position (RF13),
+ * rendered on OpenStreetMap without external API keys.
+ */
+public class ChildrenLocationFragment extends Fragment {
 
-    private static final LatLng PICHANAKI = new LatLng(-10.9279, -74.8723);
+    private static final GeoPoint PICHANAKI = new GeoPoint(-10.9279, -74.8723);
 
     private Spinner spinnerChild;
     private TextView tvChildStatus;
@@ -49,7 +53,7 @@ public class ChildrenLocationFragment extends Fragment implements OnMapReadyCall
     private TextView tvChildAccuracy;
     private TextView tvChildSafety;
     private MaterialButton btnRefreshChildLocation;
-    private GoogleMap googleMap;
+    private MapView mapView;
     private LocationDao locationDao;
     private StudentDao studentDao;
     private List<Student> children = new ArrayList<>();
@@ -79,22 +83,26 @@ public class ChildrenLocationFragment extends Fragment implements OnMapReadyCall
             if (selectedChildId != null) loadChildLocation(selectedChildId);
         });
 
-        SupportMapFragment mapFragment = (SupportMapFragment)
-                getChildFragmentManager().findFragmentById(R.id.map);
-        if (mapFragment != null) {
-            mapFragment.getMapAsync(this);
-        }
+        mapView = view.findViewById(R.id.map);
+        mapView.setTileSource(org.osmdroid.tileprovider.tilesource.TileSourceFactory.MAPNIK);
+        mapView.setMultiTouchControls(true);
+        mapView.getController().setZoom(15.0);
+        mapView.getController().setCenter(PICHANAKI);
 
         updateEmptyState();
         loadChildren();
     }
 
     @Override
-    public void onMapReady(@NonNull GoogleMap map) {
-        googleMap = map;
-        googleMap.getUiSettings().setZoomControlsEnabled(true);
-        googleMap.getUiSettings().setCompassEnabled(true);
-        googleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(PICHANAKI, 14f));
+    public void onResume() {
+        super.onResume();
+        if (mapView != null) mapView.onResume();
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        if (mapView != null) mapView.onPause();
     }
 
     private void loadChildren() {
@@ -170,44 +178,59 @@ public class ChildrenLocationFragment extends Fragment implements OnMapReadyCall
             public void onFailure(@NonNull Call<ApiResponse<Location>> call, @NonNull Throwable t) {
                 if (!isAdded()) return;
                 updateEmptyState();
-                UIUtils.showToast(requireContext(), "Error cargando ubicacion");
+                UIUtils.showToast(requireContext(), "Error cargando ubicación");
             }
         });
     }
 
     private void renderLocation(Location loc) {
-        if (googleMap != null) {
-            googleMap.clear();
-            LatLng point = new LatLng(loc.getLatitude(), loc.getLongitude());
-            googleMap.addMarker(new MarkerOptions()
-                    .position(point)
-                    .title(loc.getStudent() != null ? loc.getStudent().getFullName() : "Estudiante")
-                    .snippet(loc.isOnline() ? "GPS activo" : "Ultima ubicacion")
-                    .icon(BitmapDescriptorFactory.defaultMarker(loc.isOnline()
-                            ? BitmapDescriptorFactory.HUE_GREEN
-                            : BitmapDescriptorFactory.HUE_ORANGE)));
-            googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(point, 16f));
+        if (mapView != null) {
+            mapView.getOverlays().clear();
+            GeoPoint point = new GeoPoint(loc.getLatitude(), loc.getLongitude());
+
+            Marker marker = new Marker(mapView);
+            marker.setPosition(point);
+            marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM);
+            marker.setTitle(loc.getStudent() != null ? loc.getStudent().getFullName() : "Estudiante");
+            marker.setSnippet(loc.isOnline() ? "GPS activo" : "Última ubicación");
+
+            Drawable icon = ContextCompat.getDrawable(requireContext(),
+                    org.osmdroid.library.R.drawable.marker_default);
+            if (icon != null) {
+                Drawable tinted = DrawableCompat.wrap(icon.mutate());
+                DrawableCompat.setTint(tinted, requireContext().getColor(
+                        loc.isOnline() ? R.color.success : R.color.warning));
+                marker.setIcon(tinted);
+            }
+            marker.showInfoWindow();
+
+            mapView.getOverlays().add(marker);
+            mapView.getController().setZoom(17.0);
+            mapView.getController().animateTo(point);
+            mapView.invalidate();
         }
 
-        tvChildStatus.setText(loc.isOnline() ? "Estado: en linea" : "Estado: desconectado");
-        tvChildLastSeen.setText("Ultima conexion: " + shortTimestamp(loc.getTimestamp()));
+        tvChildStatus.setText(loc.isOnline() ? "Estado: en línea" : "Estado: desconectado");
+        tvChildLastSeen.setText("Última conexión: " + shortTimestamp(loc.getTimestamp()));
         tvChildCoordinates.setText(String.format(Locale.US, "Coordenadas: %.5f, %.5f",
                 loc.getLatitude(), loc.getLongitude()));
-        tvChildAccuracy.setText(String.format(Locale.US, "Precision GPS: %.1f m", loc.getAccuracy()));
+        tvChildAccuracy.setText(String.format(Locale.US, "Precisión GPS: %.1f m", loc.getAccuracy()));
         tvChildSafety.setText(loc.isOnline()
-                ? "Semaforo GPS: VERDE - ubicacion actualizada"
-                : "Semaforo GPS: AMARILLO - revisar ultima conexion");
+                ? "Semáforo GPS: VERDE - ubicación actualizada"
+                : "Semáforo GPS: AMARILLO - revisar última conexión");
     }
 
     private void updateEmptyState() {
         tvChildStatus.setText("Estado: --");
-        tvChildLastSeen.setText("Ultima conexion: --");
-        tvChildCoordinates.setText("Coordenadas: esperando senal GPS");
-        tvChildAccuracy.setText("Precision GPS: --");
-        tvChildSafety.setText("Semaforo GPS: esperando ubicacion");
-        if (googleMap != null) {
-            googleMap.clear();
-            googleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(PICHANAKI, 14f));
+        tvChildLastSeen.setText("Última conexión: --");
+        tvChildCoordinates.setText("Coordenadas: esperando señal GPS");
+        tvChildAccuracy.setText("Precisión GPS: --");
+        tvChildSafety.setText("Semáforo GPS: esperando ubicación");
+        if (mapView != null) {
+            mapView.getOverlays().clear();
+            mapView.getController().setZoom(15.0);
+            mapView.getController().setCenter(PICHANAKI);
+            mapView.invalidate();
         }
     }
 

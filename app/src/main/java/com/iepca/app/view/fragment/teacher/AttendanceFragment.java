@@ -20,6 +20,7 @@ import com.iepca.app.R;
 import com.iepca.app.config.RetrofitClient;
 import com.iepca.app.dao.AttendanceDao;
 import com.iepca.app.dao.CourseDao;
+import com.iepca.app.dao.StudentDao;
 import com.iepca.app.model.ApiResponse;
 import com.iepca.app.model.Attendance;
 import com.iepca.app.model.Course;
@@ -39,11 +40,14 @@ public class AttendanceFragment extends Fragment {
     private Spinner spinnerCourse;
     private MaterialButton btnDate, btnSave;
     private RecyclerView rvStudents;
+    private android.widget.TextView tvTotal, tvPresentCount;
 
     private CourseDao courseDao;
     private AttendanceDao attendanceDao;
+    private StudentDao studentDao;
     private AttendanceAdapter adapter;
     private List<Course> courses = new ArrayList<>();
+    private final Map<String, Student> studentDirectory = new HashMap<>();
     private String selectedDate;
     private String selectedCourseId;
 
@@ -59,13 +63,20 @@ public class AttendanceFragment extends Fragment {
         super.onViewCreated(view, savedInstanceState);
         courseDao = RetrofitClient.createService(requireContext(), CourseDao.class);
         attendanceDao = RetrofitClient.createService(requireContext(), AttendanceDao.class);
+        studentDao = RetrofitClient.createService(requireContext(), StudentDao.class);
 
         spinnerCourse = view.findViewById(R.id.spinnerCourse);
         btnDate = view.findViewById(R.id.btnDate);
         btnSave = view.findViewById(R.id.btnSave);
         rvStudents = view.findViewById(R.id.rvStudents);
+        tvTotal = view.findViewById(R.id.tvTotal);
+        tvPresentCount = view.findViewById(R.id.tvPresentCount);
 
         adapter = new AttendanceAdapter();
+        adapter.setOnCountChangeListener((total, present) -> {
+            tvTotal.setText("TOTAL\n" + total);
+            tvPresentCount.setText("PRESENTES\n" + present);
+        });
         rvStudents.setLayoutManager(new LinearLayoutManager(requireContext()));
         rvStudents.setAdapter(adapter);
 
@@ -75,7 +86,34 @@ public class AttendanceFragment extends Fragment {
         btnDate.setOnClickListener(v -> showDatePicker());
         btnSave.setOnClickListener(v -> saveAttendance());
 
-        loadMyCourses();
+        loadStudentDirectory();
+    }
+
+    /** Loads the real list of students so course rosters show real names. */
+    private void loadStudentDirectory() {
+        studentDao.getStudents(null, null, null, 1, 200).enqueue(
+                new Callback<ApiResponse<List<Student>>>() {
+            @Override
+            public void onResponse(@NonNull Call<ApiResponse<List<Student>>> call,
+                                   @NonNull Response<ApiResponse<List<Student>>> response) {
+                if (!isAdded()) return;
+                if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
+                    List<Student> all = response.body().getData();
+                    studentDirectory.clear();
+                    if (all != null) {
+                        for (Student s : all) {
+                            if (s.getId() != null) studentDirectory.put(s.getId(), s);
+                        }
+                    }
+                }
+                loadMyCourses();
+            }
+            @Override
+            public void onFailure(@NonNull Call<ApiResponse<List<Student>>> call, @NonNull Throwable t) {
+                if (!isAdded()) return;
+                loadMyCourses();
+            }
+        });
     }
 
     private void loadMyCourses() {
@@ -116,23 +154,33 @@ public class AttendanceFragment extends Fragment {
             public void onResponse(@NonNull Call<ApiResponse<List<Attendance>>> call,
                                    @NonNull Response<ApiResponse<List<Attendance>>> response) {
                 if (!isAdded()) return;
+                List<Student> roster = buildStudentsFromSelectedCourse();
                 if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
-                    List<Attendance> list = response.body().getData();
-                    List<Student> students = new ArrayList<>();
-                    if (list != null) {
-                        for (Attendance a : list) {
-                            if (a.getStudent() != null) students.add(a.getStudent());
+                    List<Attendance> records = response.body().getData();
+                    // Add any students that already have a record for the day
+                    // but are no longer in the course roster.
+                    if (records != null) {
+                        for (Attendance a : records) {
+                            String sid = a.getStudentId();
+                            if (sid == null) continue;
+                            boolean inRoster = false;
+                            for (Student s : roster) {
+                                if (sid.equals(s.getId())) { inRoster = true; break; }
+                            }
+                            if (!inRoster) {
+                                Student known = studentDirectory.get(sid);
+                                if (known != null) roster.add(known);
+                            }
                         }
                     }
-                    if (students.isEmpty()) {
-                        students = buildStudentsFromSelectedCourse();
-                    }
-                    adapter.setStudents(students);
                 }
+                adapter.setStudents(roster);
             }
             @Override
             public void onFailure(@NonNull Call<ApiResponse<List<Attendance>>> call, @NonNull Throwable t) {
-                if (isAdded()) UIUtils.showToast(requireContext(), "Error cargando asistencia");
+                if (!isAdded()) return;
+                adapter.setStudents(buildStudentsFromSelectedCourse());
+                UIUtils.showToast(requireContext(), "No se pudo cargar la asistencia previa");
             }
         });
     }
@@ -148,21 +196,21 @@ public class AttendanceFragment extends Fragment {
         }
 
         List<String> ids = selected != null ? selected.getStudentIds() : null;
-        String[][] demoNames = {
-                {"Vargas", "Alejandra"},
-                {"Mendoza", "Carlos"},
-                {"Ramirez", "Sofia"},
-                {"Torres", "Javier"},
-                {"Fernandez", "Laura"}
-        };
+        if (ids == null || ids.isEmpty()) {
+            return students;
+        }
 
-        int count = ids != null && !ids.isEmpty() ? ids.size() : demoNames.length;
-        for (int i = 0; i < count; i++) {
-            Student student = new Student();
-            student.setId(ids != null && i < ids.size() ? ids.get(i) : "demo-student-" + i);
-            student.setLastName(demoNames[i % demoNames.length][0]);
-            student.setFirstName(demoNames[i % demoNames.length][1]);
-            students.add(student);
+        for (String id : ids) {
+            Student known = studentDirectory.get(id);
+            if (known != null) {
+                students.add(known);
+            } else {
+                Student placeholder = new Student();
+                placeholder.setId(id);
+                placeholder.setFirstName("Estudiante");
+                placeholder.setLastName(id.length() > 6 ? id.substring(id.length() - 6) : id);
+                students.add(placeholder);
+            }
         }
         return students;
     }
@@ -182,6 +230,10 @@ public class AttendanceFragment extends Fragment {
             return;
         }
         Map<String, String> attendanceMap = adapter.getAttendanceMap();
+        if (attendanceMap.isEmpty()) {
+            UIUtils.showToast(requireContext(), "No hay estudiantes para registrar");
+            return;
+        }
         List<Map<String, String>> records = new ArrayList<>();
         for (Map.Entry<String, String> entry : attendanceMap.entrySet()) {
             Map<String, String> record = new HashMap<>();

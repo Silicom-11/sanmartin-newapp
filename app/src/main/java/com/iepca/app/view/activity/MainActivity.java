@@ -101,8 +101,23 @@ public class MainActivity extends AppCompatActivity
             binding.drawerLayout.addDrawerListener(toggle);
             toggle.syncState();
             binding.navDrawer.setNavigationItemSelectedListener(this);
+            populateDrawerHeader();
         } else {
             binding.drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED);
+        }
+    }
+
+    private void populateDrawerHeader() {
+        android.view.View header = binding.navDrawer.getHeaderView(0);
+        if (header == null) return;
+        android.widget.TextView tvUserName = header.findViewById(R.id.tvUserName);
+        android.widget.TextView tvUserRole = header.findViewById(R.id.tvUserRole);
+        if (tvUserName != null) tvUserName.setText(session.getUserName());
+        if (tvUserRole != null) {
+            String role = session.getUserRole();
+            if (role != null && !role.isEmpty()) {
+                tvUserRole.setText(role.substring(0, 1).toUpperCase() + role.substring(1));
+            }
         }
     }
 

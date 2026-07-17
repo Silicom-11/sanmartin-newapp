@@ -11,6 +11,7 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.github.mikephil.charting.charts.PieChart;
 import com.github.mikephil.charting.data.PieData;
@@ -21,13 +22,17 @@ import com.google.android.material.card.MaterialCardView;
 import com.iepca.app.R;
 import com.iepca.app.config.RetrofitClient;
 import com.iepca.app.config.SessionManager;
+import com.iepca.app.controller.StudentManagementController;
 import com.iepca.app.dao.DashboardDao;
 import com.iepca.app.dao.JustificationDao;
+import com.iepca.app.dao.callback.ApiCallback;
 import com.iepca.app.model.ApiResponse;
 import com.iepca.app.model.DashboardStats;
 import com.iepca.app.model.Justification;
+import com.iepca.app.model.Student;
 import com.iepca.app.util.UIUtils;
 import com.iepca.app.view.adapter.JustificationAdapter;
+import com.iepca.app.view.adapter.StudentAdapter;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -43,14 +48,18 @@ public class AdminDashboardFragment extends Fragment {
 
     private TextView tvWelcome, tvDate, tvStudentsCount, tvTeachersCount, tvParentsCount, tvCoursesCount;
     private PieChart chartAttendance;
-    private RecyclerView rvPendingJustifications;
-    private TextView tvNoJustifications;
+    private RecyclerView rvPendingJustifications, rvRecentStudents;
+    private TextView tvNoJustifications, tvNoStudents, btnSearchStudents;
     private MaterialButton btnNewStudent, btnNewTeacher;
     private MaterialCardView cardStudents, cardTeachers, cardParents, cardCourses;
+    private View cardLiveMap;
+    private SwipeRefreshLayout swipeRefresh;
 
     private DashboardDao dashboardDao;
     private JustificationDao justificationDao;
+    private StudentManagementController studentController;
     private JustificationAdapter justificationAdapter;
+    private StudentAdapter recentStudentsAdapter;
     private SessionManager session;
 
     @Nullable
@@ -66,12 +75,12 @@ public class AdminDashboardFragment extends Fragment {
         session = SessionManager.getInstance(requireContext());
         dashboardDao = RetrofitClient.createService(requireContext(), DashboardDao.class);
         justificationDao = RetrofitClient.createService(requireContext(), JustificationDao.class);
+        studentController = new StudentManagementController(requireContext());
 
         initViews(view);
         setupAdapters();
         setupListeners();
-        loadDashboard();
-        loadPendingJustifications();
+        refreshAll();
     }
 
     private void initViews(View v) {
@@ -83,13 +92,18 @@ public class AdminDashboardFragment extends Fragment {
         tvCoursesCount = v.findViewById(R.id.tvCoursesCount);
         chartAttendance = v.findViewById(R.id.chartAttendance);
         rvPendingJustifications = v.findViewById(R.id.rvPendingJustifications);
+        rvRecentStudents = v.findViewById(R.id.rvRecentStudents);
         tvNoJustifications = v.findViewById(R.id.tvNoJustifications);
+        tvNoStudents = v.findViewById(R.id.tvNoStudents);
+        btnSearchStudents = v.findViewById(R.id.btnSearchStudents);
         btnNewStudent = v.findViewById(R.id.btnNewStudent);
         btnNewTeacher = v.findViewById(R.id.btnNewTeacher);
         cardStudents = v.findViewById(R.id.cardStudents);
         cardTeachers = v.findViewById(R.id.cardTeachers);
         cardParents = v.findViewById(R.id.cardParents);
         cardCourses = v.findViewById(R.id.cardCourses);
+        cardLiveMap = v.findViewById(R.id.cardLiveMap);
+        swipeRefresh = v.findViewById(R.id.swipeRefresh);
 
         String dateStr = new SimpleDateFormat("EEEE, dd MMMM yyyy", new Locale("es")).format(new Date());
         tvDate.setText(dateStr);
@@ -99,14 +113,36 @@ public class AdminDashboardFragment extends Fragment {
     private void setupAdapters() {
         justificationAdapter = new JustificationAdapter(new JustificationAdapter.OnActionListener() {
             @Override
-            public void onApprove(Justification j) { reviewJustification(j.getId(), "aprobada"); }
+            public void onApprove(Justification j) { reviewJustification(j.getId(), "approved"); }
             @Override
-            public void onReject(Justification j) { reviewJustification(j.getId(), "rechazada"); }
+            public void onReject(Justification j) { reviewJustification(j.getId(), "rejected"); }
             @Override
             public void onItemClick(Justification j) {}
         }, true);
         rvPendingJustifications.setLayoutManager(new LinearLayoutManager(requireContext()));
         rvPendingJustifications.setAdapter(justificationAdapter);
+
+        recentStudentsAdapter = new StudentAdapter(student -> navigateTo(new StudentsManagementFragment()));
+        rvRecentStudents.setLayoutManager(new LinearLayoutManager(requireContext()));
+        rvRecentStudents.setAdapter(recentStudentsAdapter);
+    }
+
+    private void loadStudentNamesForJustifications() {
+        studentController.listStudents("", 1, 200, new ApiCallback<List<Student>>() {
+            @Override
+            public void onSuccess(List<Student> students) {
+                if (!isAdded()) return;
+                java.util.Map<String, String> names = new java.util.HashMap<>();
+                if (students != null) {
+                    for (Student s : students) {
+                        if (s.getId() != null) names.put(s.getId(), s.getFullName());
+                    }
+                }
+                justificationAdapter.setStudentNames(names);
+            }
+            @Override
+            public void onError(String message) {}
+        });
     }
 
     private void setupListeners() {
@@ -116,6 +152,16 @@ public class AdminDashboardFragment extends Fragment {
         cardTeachers.setOnClickListener(v -> navigateTo(new TeachersManagementFragment()));
         cardParents.setOnClickListener(v -> navigateTo(new ParentsManagementFragment()));
         cardCourses.setOnClickListener(v -> navigateTo(new CoursesManagementFragment()));
+        cardLiveMap.setOnClickListener(v -> navigateTo(new GPSTrackingFragment()));
+        btnSearchStudents.setOnClickListener(v -> navigateTo(new StudentsManagementFragment()));
+        swipeRefresh.setOnRefreshListener(this::refreshAll);
+    }
+
+    private void refreshAll() {
+        loadDashboard();
+        loadStudentNamesForJustifications();
+        loadPendingJustifications();
+        loadRecentStudents();
     }
 
     private void loadDashboard() {
@@ -124,6 +170,7 @@ public class AdminDashboardFragment extends Fragment {
             public void onResponse(@NonNull Call<ApiResponse<DashboardStats>> call,
                                    @NonNull Response<ApiResponse<DashboardStats>> response) {
                 if (!isAdded()) return;
+                swipeRefresh.setRefreshing(false);
                 if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
                     DashboardStats stats = response.body().getData();
                     tvStudentsCount.setText(String.valueOf(stats.getTotalStudents()));
@@ -136,7 +183,29 @@ public class AdminDashboardFragment extends Fragment {
 
             @Override
             public void onFailure(@NonNull Call<ApiResponse<DashboardStats>> call, @NonNull Throwable t) {
-                if (isAdded()) UIUtils.showToast(requireContext(), "Error de conexión");
+                if (!isAdded()) return;
+                swipeRefresh.setRefreshing(false);
+                UIUtils.showToast(requireContext(), "Error de conexión");
+            }
+        });
+    }
+
+    private void loadRecentStudents() {
+        studentController.listStudents("", 1, 3, new ApiCallback<List<Student>>() {
+            @Override
+            public void onSuccess(List<Student> students) {
+                if (!isAdded()) return;
+                recentStudentsAdapter.setItems(students);
+                boolean empty = students == null || students.isEmpty();
+                tvNoStudents.setVisibility(empty ? View.VISIBLE : View.GONE);
+                rvRecentStudents.setVisibility(empty ? View.GONE : View.VISIBLE);
+            }
+
+            @Override
+            public void onError(String message) {
+                if (!isAdded()) return;
+                tvNoStudents.setVisibility(View.VISIBLE);
+                rvRecentStudents.setVisibility(View.GONE);
             }
         });
     }
@@ -168,7 +237,7 @@ public class AdminDashboardFragment extends Fragment {
     }
 
     private void loadPendingJustifications() {
-        justificationDao.getJustifications("pendiente", null, 1, 5).enqueue(
+        justificationDao.getJustifications("pending", null, 1, 5).enqueue(
                 new Callback<ApiResponse<List<Justification>>>() {
             @Override
             public void onResponse(@NonNull Call<ApiResponse<List<Justification>>> call,
@@ -180,6 +249,7 @@ public class AdminDashboardFragment extends Fragment {
                         justificationAdapter.setItems(list);
                         tvNoJustifications.setVisibility(View.GONE);
                     } else {
+                        justificationAdapter.setItems(new ArrayList<>());
                         tvNoJustifications.setVisibility(View.VISIBLE);
                     }
                 }
@@ -198,7 +268,8 @@ public class AdminDashboardFragment extends Fragment {
             public void onResponse(@NonNull Call<ApiResponse<Justification>> call,
                                    @NonNull Response<ApiResponse<Justification>> response) {
                 if (isAdded()) {
-                    UIUtils.showToast(requireContext(), "Justificación " + status);
+                    String label = "approved".equals(status) ? "aprobada" : "rechazada";
+                    UIUtils.showToast(requireContext(), "Justificación " + label);
                     loadPendingJustifications();
                 }
             }

@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">IEP Continental Americano</string>
-    <string name="google_maps_key">YOUR_GOOGLE_MAPS_API_KEY</string>
 
     <!-- Auth -->
     <string name="login_title">Iniciar Sesión</string>

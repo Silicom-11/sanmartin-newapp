@@ -5,7 +5,7 @@ import com.iepca.app.model.enums.EventType;
 import java.util.List;
 
 public class Event {
-    @SerializedName("_id") private String id;
+    @SerializedName(value = "_id", alternate = {"id"}) private String id;
     private String title;
     private String date;
     private String time;

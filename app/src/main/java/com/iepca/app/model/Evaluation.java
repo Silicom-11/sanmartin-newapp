@@ -4,7 +4,7 @@ import com.google.gson.annotations.SerializedName;
 import com.iepca.app.model.enums.EvaluationType;
 
 public class Evaluation {
-    @SerializedName("_id") private String id;
+    @SerializedName(value = "_id", alternate = {"id"}) private String id;
     private String courseId;
     private String name;
     private EvaluationType type;

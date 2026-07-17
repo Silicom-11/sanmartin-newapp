@@ -25,8 +25,6 @@ import com.iepca.app.util.UIUtils;
 
 import java.util.*;
 
-import okhttp3.MediaType;
-import okhttp3.RequestBody;
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
@@ -117,28 +115,44 @@ public class JustificationFormFragment extends Fragment {
         String studentId = children.get(childPos).getId();
         String reason = spinnerReason.getSelectedItem().toString();
         String description = etDescription.getText() != null ? etDescription.getText().toString() : "";
-        String dates = startDate;
 
-        MediaType textType = MediaType.parse("text/plain");
-        justificationDao.submitJustification(
-                RequestBody.create(textType, studentId),
-                RequestBody.create(textType, reason),
-                RequestBody.create(textType, dates),
-                RequestBody.create(textType, description),
-                new ArrayList<>()
-        ).enqueue(new Callback<ApiResponse<Justification>>() {
+        // Backend expects a JSON Justification with an ISO-8601 dates list.
+        Map<String, Object> body = new HashMap<>();
+        body.put("student", studentId);
+        body.put("reason", reason);
+        body.put("observations", description);
+        List<String> dates = new ArrayList<>();
+        dates.add(startDate + "T00:00:00.000Z");
+        body.put("dates", dates);
+
+        btnSubmit.setEnabled(false);
+        justificationDao.submitJustification(body).enqueue(new Callback<ApiResponse<Justification>>() {
             @Override
             public void onResponse(@NonNull Call<ApiResponse<Justification>> call,
                                    @NonNull Response<ApiResponse<Justification>> response) {
-                if (isAdded()) {
+                if (!isAdded()) return;
+                btnSubmit.setEnabled(true);
+                if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
                     UIUtils.showToast(requireContext(), "Justificación enviada");
-                    if (getActivity() != null) getActivity().onBackPressed();
+                    resetForm();
+                } else {
+                    UIUtils.showToast(requireContext(), "No se pudo enviar la justificación");
                 }
             }
             @Override
             public void onFailure(@NonNull Call<ApiResponse<Justification>> call, @NonNull Throwable t) {
-                if (isAdded()) UIUtils.showToast(requireContext(), "Error al enviar justificación");
+                if (!isAdded()) return;
+                btnSubmit.setEnabled(true);
+                UIUtils.showToast(requireContext(), "Error de conexión al enviar");
             }
         });
+    }
+
+    private void resetForm() {
+        startDate = "";
+        endDate = "";
+        btnDateRange.setText("Seleccionar fechas");
+        spinnerReason.setSelection(0);
+        if (etDescription.getText() != null) etDescription.getText().clear();
     }
 }

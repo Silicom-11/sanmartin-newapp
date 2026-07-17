@@ -1,5 +1,6 @@
 package com.iepca.app.view.fragment.admin;
 
+import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -11,16 +12,10 @@ import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.content.ContextCompat;
+import androidx.core.graphics.drawable.DrawableCompat;
 import androidx.fragment.app.Fragment;
 
-import com.google.android.gms.maps.CameraUpdateFactory;
-import com.google.android.gms.maps.GoogleMap;
-import com.google.android.gms.maps.OnMapReadyCallback;
-import com.google.android.gms.maps.SupportMapFragment;
-import com.google.android.gms.maps.model.BitmapDescriptorFactory;
-import com.google.android.gms.maps.model.LatLng;
-import com.google.android.gms.maps.model.LatLngBounds;
-import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.material.button.MaterialButton;
 import com.iepca.app.R;
 import com.iepca.app.config.RetrofitClient;
@@ -28,6 +23,11 @@ import com.iepca.app.dao.LocationDao;
 import com.iepca.app.model.ApiResponse;
 import com.iepca.app.model.Location;
 import com.iepca.app.util.UIUtils;
+
+import org.osmdroid.util.BoundingBox;
+import org.osmdroid.util.GeoPoint;
+import org.osmdroid.views.MapView;
+import org.osmdroid.views.overlay.Marker;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -37,9 +37,15 @@ import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 
-public class GPSTrackingFragment extends Fragment implements OnMapReadyCallback {
+/**
+ * Live GPS monitor for the administrator (RF13).
+ *
+ * Shows every student's last known position on an OpenStreetMap view
+ * (no API key required) with online/offline markers.
+ */
+public class GPSTrackingFragment extends Fragment {
 
-    private static final LatLng PICHANAKI = new LatLng(-10.9279, -74.8723);
+    private static final GeoPoint PICHANAKI = new GeoPoint(-10.9279, -74.8723);
 
     private Spinner spinnerStudent;
     private TextView tvStatus;
@@ -48,7 +54,7 @@ public class GPSTrackingFragment extends Fragment implements OnMapReadyCallback 
     private TextView tvCoordinates;
     private TextView tvAccuracy;
     private MaterialButton btnRefreshGps;
-    private GoogleMap googleMap;
+    private MapView mapView;
     private LocationDao locationDao;
     private List<Location> studentLocations = new ArrayList<>();
 
@@ -73,23 +79,26 @@ public class GPSTrackingFragment extends Fragment implements OnMapReadyCallback 
         btnRefreshGps = view.findViewById(R.id.btnRefreshGps);
         btnRefreshGps.setOnClickListener(v -> loadStudentLocations());
 
-        SupportMapFragment mapFragment = (SupportMapFragment)
-                getChildFragmentManager().findFragmentById(R.id.map);
-        if (mapFragment != null) {
-            mapFragment.getMapAsync(this);
-        }
+        mapView = view.findViewById(R.id.map);
+        mapView.setTileSource(org.osmdroid.tileprovider.tilesource.TileSourceFactory.MAPNIK);
+        mapView.setMultiTouchControls(true);
+        mapView.getController().setZoom(15.0);
+        mapView.getController().setCenter(PICHANAKI);
 
         updateEmptyState();
         loadStudentLocations();
     }
 
     @Override
-    public void onMapReady(@NonNull GoogleMap map) {
-        googleMap = map;
-        googleMap.getUiSettings().setZoomControlsEnabled(true);
-        googleMap.getUiSettings().setCompassEnabled(true);
-        googleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(PICHANAKI, 14f));
-        showAllMarkers();
+    public void onResume() {
+        super.onResume();
+        if (mapView != null) mapView.onResume();
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        if (mapView != null) mapView.onPause();
     }
 
     private void loadStudentLocations() {
@@ -147,51 +156,63 @@ public class GPSTrackingFragment extends Fragment implements OnMapReadyCallback 
         });
     }
 
+    private Marker buildMarker(Location loc, String title) {
+        Marker marker = new Marker(mapView);
+        marker.setPosition(new GeoPoint(loc.getLatitude(), loc.getLongitude()));
+        marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM);
+        marker.setTitle(title);
+        marker.setSnippet(loc.isOnline() ? "GPS activo" : "Última ubicación");
+
+        Drawable icon = ContextCompat.getDrawable(requireContext(),
+                org.osmdroid.library.R.drawable.marker_default);
+        if (icon != null) {
+            Drawable tinted = DrawableCompat.wrap(icon.mutate());
+            DrawableCompat.setTint(tinted, requireContext().getColor(
+                    loc.isOnline() ? R.color.success : R.color.warning));
+            marker.setIcon(tinted);
+        }
+        return marker;
+    }
+
     private void showAllMarkers() {
-        if (googleMap == null) return;
-        googleMap.clear();
+        if (mapView == null) return;
+        mapView.getOverlays().clear();
+
         if (studentLocations == null || studentLocations.isEmpty()) {
-            googleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(PICHANAKI, 14f));
+            mapView.getController().setZoom(15.0);
+            mapView.getController().setCenter(PICHANAKI);
+            mapView.invalidate();
             return;
         }
 
-        LatLngBounds.Builder bounds = LatLngBounds.builder();
-        int validMarkers = 0;
+        List<GeoPoint> points = new ArrayList<>();
         for (Location loc : studentLocations) {
             if (!isValidLocation(loc)) continue;
-            LatLng point = new LatLng(loc.getLatitude(), loc.getLongitude());
             String title = loc.getStudent() != null ? loc.getStudent().getFullName() : "Alumno";
-            googleMap.addMarker(new MarkerOptions()
-                    .position(point)
-                    .title(title)
-                    .snippet(loc.isOnline() ? "GPS activo" : "Ultima ubicacion")
-                    .icon(BitmapDescriptorFactory.defaultMarker(loc.isOnline()
-                            ? BitmapDescriptorFactory.HUE_GREEN
-                            : BitmapDescriptorFactory.HUE_ORANGE)));
-            bounds.include(point);
-            validMarkers++;
+            mapView.getOverlays().add(buildMarker(loc, title));
+            points.add(new GeoPoint(loc.getLatitude(), loc.getLongitude()));
         }
 
-        if (validMarkers == 1) {
-            googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(bounds.build().getCenter(), 15f));
-        } else if (validMarkers > 1) {
-            googleMap.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds.build(), 90));
+        if (points.size() == 1) {
+            mapView.getController().setZoom(16.0);
+            mapView.getController().animateTo(points.get(0));
+        } else if (points.size() > 1) {
+            BoundingBox box = BoundingBox.fromGeoPoints(points);
+            mapView.post(() -> mapView.zoomToBoundingBox(box.increaseByScale(1.4f), true));
         }
+        mapView.invalidate();
     }
 
     private void showSingleMarker(Location loc) {
-        if (googleMap == null || !isValidLocation(loc)) return;
-        googleMap.clear();
-        LatLng point = new LatLng(loc.getLatitude(), loc.getLongitude());
-        String title = loc.getStudent() != null ? loc.getStudent().getFullName() : "Ubicacion actual";
-        googleMap.addMarker(new MarkerOptions()
-                .position(point)
-                .title(title)
-                .snippet(loc.isOnline() ? "En linea" : "Desconectado")
-                .icon(BitmapDescriptorFactory.defaultMarker(loc.isOnline()
-                        ? BitmapDescriptorFactory.HUE_GREEN
-                        : BitmapDescriptorFactory.HUE_ORANGE)));
-        googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(point, 16f));
+        if (mapView == null || !isValidLocation(loc)) return;
+        mapView.getOverlays().clear();
+        String title = loc.getStudent() != null ? loc.getStudent().getFullName() : "Ubicación actual";
+        Marker marker = buildMarker(loc, title);
+        marker.showInfoWindow();
+        mapView.getOverlays().add(marker);
+        mapView.getController().setZoom(17.0);
+        mapView.getController().animateTo(new GeoPoint(loc.getLatitude(), loc.getLongitude()));
+        mapView.invalidate();
     }
 
     private void updateSummaryForAll() {
@@ -204,16 +225,16 @@ public class GPSTrackingFragment extends Fragment implements OnMapReadyCallback 
         tvBattery.setText(total > 0 ? total + " GPS" : "--");
         tvLastUpdate.setText(total > 0 ? "Panel actualizado" : "--");
         tvCoordinates.setText("Coordenadas: " + total + " estudiantes monitoreados");
-        tvAccuracy.setText("Precision: seleccione un estudiante para ver detalle");
+        tvAccuracy.setText("Precisión: seleccione un estudiante para ver detalle");
     }
 
     private void updateSummaryForLocation(Location loc) {
-        tvStatus.setText(loc.isOnline() ? "En linea" : "Offline");
+        tvStatus.setText(loc.isOnline() ? "En línea" : "Offline");
         tvLastUpdate.setText(shortTimestamp(loc.getTimestamp()));
         tvBattery.setText((int) loc.getBattery() + "%");
         tvCoordinates.setText(String.format(Locale.US, "Coordenadas: %.5f, %.5f",
                 loc.getLatitude(), loc.getLongitude()));
-        tvAccuracy.setText(String.format(Locale.US, "Precision: %.1f m | Velocidad: %.1f m/s",
+        tvAccuracy.setText(String.format(Locale.US, "Precisión: %.1f m | Velocidad: %.1f m/s",
                 loc.getAccuracy(), loc.getSpeed()));
     }
 
@@ -221,8 +242,8 @@ public class GPSTrackingFragment extends Fragment implements OnMapReadyCallback 
         tvStatus.setText("Sin datos");
         tvLastUpdate.setText("--");
         tvBattery.setText("--");
-        tvCoordinates.setText("Coordenadas: esperando senal GPS");
-        tvAccuracy.setText("Precision: --");
+        tvCoordinates.setText("Coordenadas: esperando señal GPS");
+        tvAccuracy.setText("Precisión: --");
     }
 
     private boolean isValidLocation(Location loc) {

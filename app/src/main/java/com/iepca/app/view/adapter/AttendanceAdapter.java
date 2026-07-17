@@ -24,8 +24,18 @@ import java.util.Map;
  */
 public class AttendanceAdapter extends RecyclerView.Adapter<AttendanceAdapter.ViewHolder> {
 
+    /** Notifies the host when attendance counters change. */
+    public interface OnCountChangeListener {
+        void onCountChanged(int total, int present);
+    }
+
     private List<Student> students = new ArrayList<>();
     private final Map<String, String> attendanceMap = new HashMap<>();
+    private OnCountChangeListener countListener;
+
+    public void setOnCountChangeListener(OnCountChangeListener listener) {
+        this.countListener = listener;
+    }
 
     public void setStudents(List<Student> newStudents) {
         this.students = newStudents != null ? newStudents : new ArrayList<>();
@@ -34,11 +44,21 @@ public class AttendanceAdapter extends RecyclerView.Adapter<AttendanceAdapter.Vi
             attendanceMap.put(s.getId(), "present");
         }
         notifyDataSetChanged();
+        notifyCounts();
     }
 
     /** Returns map of studentId -> status (present/absent/late) */
     public Map<String, String> getAttendanceMap() {
         return new HashMap<>(attendanceMap);
+    }
+
+    private void notifyCounts() {
+        if (countListener == null) return;
+        int present = 0;
+        for (String status : attendanceMap.values()) {
+            if ("present".equals(status)) present++;
+        }
+        countListener.onCountChanged(students.size(), present);
     }
 
     @NonNull
@@ -91,6 +111,7 @@ public class AttendanceAdapter extends RecyclerView.Adapter<AttendanceAdapter.Vi
                     status = "present";
                 }
                 attendanceMap.put(student.getId(), status);
+                notifyCounts();
             });
         }
     }

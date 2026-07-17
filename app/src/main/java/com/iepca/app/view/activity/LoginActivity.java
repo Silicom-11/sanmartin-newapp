@@ -57,6 +57,22 @@ public class LoginActivity extends AppCompatActivity {
 
         binding.tilEmail.setError(null);
         binding.tilPassword.setError(null);
+
+        boolean valid = true;
+        if (email.isEmpty()) {
+            binding.tilEmail.setError("Ingresa tu correo");
+            valid = false;
+        } else if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+            binding.tilEmail.setError("Correo no válido");
+            valid = false;
+        }
+        if (password.isEmpty()) {
+            binding.tilPassword.setError("Ingresa tu contraseña");
+            valid = false;
+        }
+        if (!valid) return;
+
+        UIUtils.hideKeyboard(this);
         setLoading(true);
 
         authController.login(email, password, new ApiCallback<AuthResponse>() {

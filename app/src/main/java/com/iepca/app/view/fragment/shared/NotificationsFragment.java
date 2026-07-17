@@ -48,12 +48,25 @@ public class NotificationsFragment extends Fragment {
         swipeRefresh = view.findViewById(R.id.swipeRefresh);
         rvNotifications = view.findViewById(R.id.rvNotifications);
 
-        adapter = new NotificationAdapter();
+        adapter = new NotificationAdapter(this::markAsRead);
         rvNotifications.setLayoutManager(new LinearLayoutManager(requireContext()));
         rvNotifications.setAdapter(adapter);
 
         swipeRefresh.setOnRefreshListener(this::loadNotifications);
         loadNotifications();
+    }
+
+    private void markAsRead(Notification notification) {
+        if (notification.isRead() || notification.getId() == null) return;
+        notificationDao.markAsRead(notification.getId()).enqueue(new Callback<ApiResponse<Void>>() {
+            @Override
+            public void onResponse(@NonNull Call<ApiResponse<Void>> call,
+                                   @NonNull Response<ApiResponse<Void>> response) {
+                if (isAdded()) loadNotifications();
+            }
+            @Override
+            public void onFailure(@NonNull Call<ApiResponse<Void>> call, @NonNull Throwable t) {}
+        });
     }
 
     private void loadNotifications() {

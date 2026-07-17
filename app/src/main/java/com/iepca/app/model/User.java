@@ -5,7 +5,7 @@ import com.iepca.app.model.enums.UserRole;
 import java.util.List;
 
 public class User {
-    @SerializedName("_id") private String id;
+    @SerializedName(value = "_id", alternate = {"id"}) private String id;
     private String email;
     private String firstName;
     private String lastName;

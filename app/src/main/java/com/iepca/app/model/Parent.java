@@ -4,7 +4,7 @@ import com.google.gson.annotations.SerializedName;
 import java.util.List;
 
 public class Parent {
-    @SerializedName("_id") private String id;
+    @SerializedName(value = "_id", alternate = {"id"}) private String id;
     private String userId;
     private String firstName;
     private String lastName;

@@ -5,9 +5,10 @@ import com.iepca.app.model.enums.JustificationStatus;
 import java.util.List;
 
 public class Justification {
-    @SerializedName("_id") private String id;
-    private String studentId;
-    private String parentId;
+    @SerializedName(value = "_id", alternate = {"id"}) private String id;
+    // Backend serializes these refs as plain id strings.
+    @SerializedName(value = "student", alternate = {"studentId"}) private String studentId;
+    @SerializedName(value = "parent", alternate = {"parentId"}) private String parentId;
     private List<String> dates;
     private String reason;
     private String observations;
@@ -16,8 +17,6 @@ public class Justification {
     private String reviewedBy;
     private String reviewNote;
     private String createdAt;
-    private Student student;
-    private Parent parent;
 
     public String getId() { return id; }
     public String getStudentId() { return studentId; }
@@ -30,8 +29,6 @@ public class Justification {
     public String getReviewedBy() { return reviewedBy; }
     public String getReviewNote() { return reviewNote; }
     public String getCreatedAt() { return createdAt; }
-    public Student getStudent() { return student; }
-    public Parent getParent() { return parent; }
 
     public void setStudentId(String s) { this.studentId = s; }
     public void setParentId(String p) { this.parentId = p; }

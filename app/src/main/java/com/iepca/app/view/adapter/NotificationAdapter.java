@@ -19,7 +19,18 @@ import java.util.List;
  */
 public class NotificationAdapter extends RecyclerView.Adapter<NotificationAdapter.ViewHolder> {
 
+    public interface OnItemClickListener {
+        void onItemClick(Notification notification);
+    }
+
     private List<Notification> items = new ArrayList<>();
+    private OnItemClickListener listener;
+
+    public NotificationAdapter() {}
+
+    public NotificationAdapter(OnItemClickListener listener) {
+        this.listener = listener;
+    }
 
     public void setItems(List<Notification> newItems) {
         this.items = newItems != null ? newItems : new ArrayList<>();
@@ -63,6 +74,9 @@ public class NotificationAdapter extends RecyclerView.Adapter<NotificationAdapte
             tvBody.setText(n.getMessage() != null ? n.getMessage() : "");
             tvTime.setText(formatTime(n.getCreatedAt()));
             viewDot.setVisibility(n.isRead() ? View.INVISIBLE : View.VISIBLE);
+            itemView.setOnClickListener(v -> {
+                if (listener != null) listener.onItemClick(n);
+            });
         }
 
         private String formatTime(String raw) {

@@ -27,6 +27,21 @@ public class App extends Application {
         instance = this;
         LOG.info("Application started - IEP Continental Americano");
         createNotificationChannels();
+        configureMapEngine();
+    }
+
+    /**
+     * osmdroid (OpenStreetMap) setup: identify the app to the tile servers
+     * and keep the tile cache inside app-private storage.
+     */
+    private void configureMapEngine() {
+        org.osmdroid.config.IConfigurationProvider config =
+                org.osmdroid.config.Configuration.getInstance();
+        config.load(this, getSharedPreferences("osmdroid_prefs", MODE_PRIVATE));
+        config.setUserAgentValue(getPackageName());
+        config.setOsmdroidBasePath(new java.io.File(getFilesDir(), "osmdroid"));
+        config.setOsmdroidTileCache(new java.io.File(getFilesDir(), "osmdroid/tiles"));
+        LOG.info("Map engine configured (osmdroid)");
     }
 
     public static App getInstance() {

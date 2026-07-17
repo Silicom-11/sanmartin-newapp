@@ -18,8 +18,10 @@ import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 import com.iepca.app.R;
 import com.iepca.app.config.RetrofitClient;
 import com.iepca.app.dao.JustificationDao;
+import com.iepca.app.dao.StudentDao;
 import com.iepca.app.model.ApiResponse;
 import com.iepca.app.model.Justification;
+import com.iepca.app.model.Student;
 import com.iepca.app.util.UIUtils;
 import com.iepca.app.view.adapter.JustificationAdapter;
 
@@ -40,6 +42,7 @@ public class JustificationsManagementFragment extends Fragment {
     private TextView tvCount;
 
     private JustificationDao justificationDao;
+    private StudentDao studentDao;
     private JustificationAdapter adapter;
 
     @Nullable
@@ -53,6 +56,7 @@ public class JustificationsManagementFragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
         justificationDao = RetrofitClient.createService(requireContext(), JustificationDao.class);
+        studentDao = RetrofitClient.createService(requireContext(), StudentDao.class);
 
         recyclerView = view.findViewById(R.id.recyclerView);
         swipeRefresh = view.findViewById(R.id.swipeRefresh);
@@ -62,9 +66,9 @@ public class JustificationsManagementFragment extends Fragment {
 
         adapter = new JustificationAdapter(new JustificationAdapter.OnActionListener() {
             @Override
-            public void onApprove(Justification j) { reviewJustification(j.getId(), "aprobada"); }
+            public void onApprove(Justification j) { reviewJustification(j.getId(), "approved"); }
             @Override
-            public void onReject(Justification j) { reviewJustification(j.getId(), "rechazada"); }
+            public void onReject(Justification j) { reviewJustification(j.getId(), "rejected"); }
             @Override
             public void onItemClick(Justification j) {}
         }, true);
@@ -72,7 +76,30 @@ public class JustificationsManagementFragment extends Fragment {
         recyclerView.setAdapter(adapter);
 
         swipeRefresh.setOnRefreshListener(this::loadJustifications);
+        loadStudentNames();
         loadJustifications();
+    }
+
+    private void loadStudentNames() {
+        studentDao.getStudents(null, null, null, 1, 200).enqueue(new Callback<ApiResponse<List<Student>>>() {
+            @Override
+            public void onResponse(@NonNull Call<ApiResponse<List<Student>>> call,
+                                   @NonNull Response<ApiResponse<List<Student>>> response) {
+                if (!isAdded()) return;
+                if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
+                    List<Student> students = response.body().getData();
+                    Map<String, String> names = new HashMap<>();
+                    if (students != null) {
+                        for (Student s : students) {
+                            if (s.getId() != null) names.put(s.getId(), s.getFullName());
+                        }
+                    }
+                    adapter.setStudentNames(names);
+                }
+            }
+            @Override
+            public void onFailure(@NonNull Call<ApiResponse<List<Student>>> call, @NonNull Throwable t) {}
+        });
     }
 
     private void loadJustifications() {
@@ -111,7 +138,8 @@ public class JustificationsManagementFragment extends Fragment {
             public void onResponse(@NonNull Call<ApiResponse<Justification>> call,
                                    @NonNull Response<ApiResponse<Justification>> response) {
                 if (isAdded()) {
-                    UIUtils.showToast(requireContext(), "Justificación " + status);
+                    String label = "approved".equals(status) ? "aprobada" : "rechazada";
+                    UIUtils.showToast(requireContext(), "Justificación " + label);
                     loadJustifications();
                 }
             }

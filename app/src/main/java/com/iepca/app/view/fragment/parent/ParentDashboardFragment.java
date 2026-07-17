@@ -11,6 +11,7 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.google.android.material.button.MaterialButton;
 import com.iepca.app.R;
@@ -25,6 +26,7 @@ import com.iepca.app.model.Student;
 import com.iepca.app.util.UIUtils;
 import com.iepca.app.view.adapter.ChildCardAdapter;
 import com.iepca.app.view.adapter.NotificationAdapter;
+import com.iepca.app.view.fragment.shared.NotificationsFragment;
 
 import java.util.List;
 import java.util.Locale;
@@ -36,9 +38,11 @@ import retrofit2.Response;
 
 public class ParentDashboardFragment extends Fragment {
 
-    private TextView tvWelcome;
+    private TextView tvWelcome, tvNoChildren, tvNoNotifications;
     private RecyclerView rvChildren, rvNotifications;
     private MaterialButton btnGrades, btnLocation, btnJustify;
+    private View btnNotifications;
+    private SwipeRefreshLayout swipeRefresh;
     private StudentDao studentDao;
     private ParentDao parentDao;
     private NotificationDao notificationDao;
@@ -62,16 +66,20 @@ public class ParentDashboardFragment extends Fragment {
         notificationDao = RetrofitClient.createService(requireContext(), NotificationDao.class);
 
         tvWelcome = view.findViewById(R.id.tvWelcome);
+        tvNoChildren = view.findViewById(R.id.tvNoChildren);
+        tvNoNotifications = view.findViewById(R.id.tvNoNotifications);
         rvChildren = view.findViewById(R.id.rvChildren);
         rvNotifications = view.findViewById(R.id.rvNotifications);
         btnGrades = view.findViewById(R.id.btnGrades);
         btnLocation = view.findViewById(R.id.btnLocation);
         btnJustify = view.findViewById(R.id.btnJustify);
+        btnNotifications = view.findViewById(R.id.btnNotifications);
+        swipeRefresh = view.findViewById(R.id.swipeRefresh);
 
         tvWelcome.setText("Bienvenido, " + session.getUserName());
 
         childAdapter = new ChildCardAdapter(child ->
-                UIUtils.showToast(requireContext(), child.getFullName()));
+                navigateToNav(R.id.nav_grades, new ChildrenGradesFragment()));
         rvChildren.setLayoutManager(new LinearLayoutManager(requireContext()));
         rvChildren.setAdapter(childAdapter);
 
@@ -82,7 +90,13 @@ public class ParentDashboardFragment extends Fragment {
         btnGrades.setOnClickListener(v -> navigateToNav(R.id.nav_grades, new ChildrenGradesFragment()));
         btnLocation.setOnClickListener(v -> navigateToNav(R.id.nav_gps, new ChildrenLocationFragment()));
         btnJustify.setOnClickListener(v -> navigateToNav(R.id.nav_justifications, new JustificationFormFragment()));
+        btnNotifications.setOnClickListener(v -> navigateTo(new NotificationsFragment()));
+        swipeRefresh.setOnRefreshListener(this::refreshAll);
 
+        refreshAll();
+    }
+
+    private void refreshAll() {
         loadChildren();
         loadNotifications();
     }
@@ -93,15 +107,21 @@ public class ParentDashboardFragment extends Fragment {
             public void onResponse(@NonNull Call<ApiResponse<List<Student>>> call,
                                    @NonNull Response<ApiResponse<List<Student>>> response) {
                 if (!isAdded()) return;
+                swipeRefresh.setRefreshing(false);
                 if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
                     List<Student> children = response.body().getData();
                     childAdapter.setItems(children);
+                    boolean empty = children == null || children.isEmpty();
+                    tvNoChildren.setVisibility(empty ? View.VISIBLE : View.GONE);
+                    rvChildren.setVisibility(empty ? View.GONE : View.VISIBLE);
                     loadAttendanceRates(children);
                 }
             }
             @Override
             public void onFailure(@NonNull Call<ApiResponse<List<Student>>> call, @NonNull Throwable t) {
-                if (isAdded()) UIUtils.showToast(requireContext(), "Error cargando hijos");
+                if (!isAdded()) return;
+                swipeRefresh.setRefreshing(false);
+                UIUtils.showToast(requireContext(), "Error cargando hijos");
             }
         });
     }
@@ -147,7 +167,11 @@ public class ParentDashboardFragment extends Fragment {
                                    @NonNull Response<ApiResponse<List<Notification>>> response) {
                 if (!isAdded()) return;
                 if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
-                    notificationAdapter.setItems(response.body().getData());
+                    List<Notification> list = response.body().getData();
+                    notificationAdapter.setItems(list);
+                    boolean empty = list == null || list.isEmpty();
+                    tvNoNotifications.setVisibility(empty ? View.VISIBLE : View.GONE);
+                    rvNotifications.setVisibility(empty ? View.GONE : View.VISIBLE);
                 }
             }
             @Override

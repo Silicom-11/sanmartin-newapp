@@ -25,6 +25,12 @@ public interface GradeDao {
             @Query("courseId") String courseId,
             @Query("bimester") int bimester);
 
+    @GET("grades/stats")
+    Call<ApiResponse<Map<String, Object>>> getGlobalGradeStats();
+
+    @GET("grades")
+    Call<ApiResponse<List<Grade>>> getAllGrades();
+
     @GET("grades/report/{courseId}")
     Call<ApiResponse<Map<String, Object>>> getCourseReport(@Path("courseId") String courseId);
 

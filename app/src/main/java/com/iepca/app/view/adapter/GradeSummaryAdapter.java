@@ -13,17 +13,36 @@ import com.iepca.app.model.Grade;
 import com.iepca.app.util.GradeUtils;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
- * RecyclerView Adapter for Grade Summary display (student/parent views).
+ * RecyclerView Adapter for Grade Summary display.
+ *
+ * Course and student ids coming from the API are resolved to real names
+ * through the optional directories set by the host screen.
  */
 public class GradeSummaryAdapter extends RecyclerView.Adapter<GradeSummaryAdapter.ViewHolder> {
 
     private List<Grade> items = new ArrayList<>();
+    private Map<String, String> courseNames = new HashMap<>();
+    private Map<String, String> studentNames = new HashMap<>();
 
     public void setItems(List<Grade> newItems) {
         this.items = newItems != null ? newItems : new ArrayList<>();
+        notifyDataSetChanged();
+    }
+
+    /** courseId -> course display name */
+    public void setCourseNames(Map<String, String> names) {
+        this.courseNames = names != null ? names : new HashMap<>();
+        notifyDataSetChanged();
+    }
+
+    /** studentId -> student display name (used in the admin view) */
+    public void setStudentNames(Map<String, String> names) {
+        this.studentNames = names != null ? names : new HashMap<>();
         notifyDataSetChanged();
     }
 
@@ -57,12 +76,15 @@ public class GradeSummaryAdapter extends RecyclerView.Adapter<GradeSummaryAdapte
         }
 
         void bind(Grade grade) {
-            String subject = grade.getCourseId() != null ? grade.getCourseId() : "Curso";
-            if (subject.matches("[a-fA-F0-9]{24}")) {
-                subject = "Matematica - 3A";
+            tvSubject.setText(resolveCourse(grade.getCourseId()));
+
+            String studentName = grade.getStudentId() != null
+                    ? studentNames.get(grade.getStudentId()) : null;
+            String detail = "Bimestre " + grade.getBimester();
+            if (studentName != null) {
+                detail = studentName + " — " + detail;
             }
-            tvSubject.setText(subject);
-            tvTeacher.setText("Bimestre " + grade.getBimester());
+            tvTeacher.setText(detail);
 
             double value = grade.getScore();
             tvGrade.setText(String.valueOf((int) value));
@@ -71,6 +93,16 @@ public class GradeSummaryAdapter extends RecyclerView.Adapter<GradeSummaryAdapte
 
             int color = GradeUtils.getGradeColor(tvScale.getContext(), value);
             tvScale.setTextColor(color);
+        }
+
+        private String resolveCourse(String courseId) {
+            if (courseId == null) return "Curso";
+            String known = courseNames.get(courseId);
+            if (known != null) return known;
+            if (courseId.matches("[a-fA-F0-9]{24}")) {
+                return "Curso " + courseId.substring(courseId.length() - 4);
+            }
+            return courseId;
         }
     }
 }

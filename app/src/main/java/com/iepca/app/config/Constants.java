@@ -11,9 +11,9 @@ public final class Constants {
     }
 
     // API Configuration
-    // Local emulator bridge: use "adb reverse tcp:5000 tcp:5000" so the emulator
-    // reaches the Spring Boot backend through 127.0.0.1.
-    public static final String BASE_URL = "http://127.0.0.1:5000/api/";
+    // Resolved per build type: debug uses the local backend through
+    // "adb reverse tcp:5000 tcp:5000"; release points to the production server.
+    public static final String BASE_URL = com.iepca.app.BuildConfig.API_BASE_URL;
     public static final int CONNECT_TIMEOUT = 30; // seconds
     public static final int READ_TIMEOUT = 30;
     public static final int WRITE_TIMEOUT = 30;
@@ -48,10 +48,10 @@ public final class Constants {
     public static final String ATTENDANCE_LATE = "late";
     public static final String ATTENDANCE_JUSTIFIED = "justified";
 
-    // Justification Status
-    public static final String JUSTIFICATION_PENDING = "pendiente";
-    public static final String JUSTIFICATION_APPROVED = "aprobada";
-    public static final String JUSTIFICATION_REJECTED = "rechazada";
+    // Justification Status (wire values must match backend — English)
+    public static final String JUSTIFICATION_PENDING = "pending";
+    public static final String JUSTIFICATION_APPROVED = "approved";
+    public static final String JUSTIFICATION_REJECTED = "rejected";
 
     // Grade Scale
     public static final int GRADE_AD_MIN = 17;

@@ -25,6 +25,8 @@ import com.github.mikephil.charting.formatter.IndexAxisValueFormatter;
 import com.google.android.material.button.MaterialButton;
 import com.iepca.app.R;
 import com.iepca.app.config.RetrofitClient;
+import com.iepca.app.dao.AttendanceDao;
+import com.iepca.app.dao.GradeDao;
 import com.iepca.app.dao.ReportDao;
 import com.iepca.app.dao.SystemDao;
 import com.iepca.app.model.ApiResponse;
@@ -57,6 +59,8 @@ public class ReportsFragment extends Fragment {
     private MaterialButton btnExportExcel;
     private SystemDao systemDao;
     private ReportDao reportDao;
+    private AttendanceDao attendanceDao;
+    private GradeDao gradeDao;
 
     @Nullable
     @Override
@@ -71,6 +75,8 @@ public class ReportsFragment extends Fragment {
 
         systemDao = RetrofitClient.createService(requireContext(), SystemDao.class);
         reportDao = RetrofitClient.createService(requireContext(), ReportDao.class);
+        attendanceDao = RetrofitClient.createService(requireContext(), AttendanceDao.class);
+        gradeDao = RetrofitClient.createService(requireContext(), GradeDao.class);
 
         chartWeeklyAttendance = view.findViewById(R.id.chartWeeklyAttendance);
         chartGrades = view.findViewById(R.id.chartGrades);
@@ -79,12 +85,58 @@ public class ReportsFragment extends Fragment {
         btnTestJavaResources = view.findViewById(R.id.btnTestJavaResources);
         btnExportExcel = view.findViewById(R.id.btnExportExcel);
 
-        setupAttendanceChart();
-        setupGradesChart();
-        setupRiskChart();
+        loadAttendanceChart();
+        loadGradesChart();
 
         btnTestJavaResources.setOnClickListener(v -> verifySystemServices());
         btnExportExcel.setOnClickListener(v -> downloadExcelReport());
+    }
+
+    private void loadAttendanceChart() {
+        attendanceDao.getAttendanceStats().enqueue(new Callback<ApiResponse<Map<String, Object>>>() {
+            @Override
+            public void onResponse(@NonNull Call<ApiResponse<Map<String, Object>>> call,
+                                   @NonNull Response<ApiResponse<Map<String, Object>>> response) {
+                if (!isAdded()) return;
+                if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
+                    Map<String, Object> data = response.body().getData();
+                    float present = num(data, "present");
+                    float late = num(data, "late");
+                    float absent = num(data, "absent");
+                    float justified = num(data, "justified");
+                    setupAttendanceChart(present, late, absent, justified);
+                    setupRiskChart(num(data, "attendanceRate"));
+                }
+            }
+            @Override
+            public void onFailure(@NonNull Call<ApiResponse<Map<String, Object>>> call, @NonNull Throwable t) {
+                if (isAdded()) setupAttendanceChart(0, 0, 0, 0);
+            }
+        });
+    }
+
+    private void loadGradesChart() {
+        gradeDao.getGlobalGradeStats().enqueue(new Callback<ApiResponse<Map<String, Object>>>() {
+            @Override
+            public void onResponse(@NonNull Call<ApiResponse<Map<String, Object>>> call,
+                                   @NonNull Response<ApiResponse<Map<String, Object>>> response) {
+                if (!isAdded()) return;
+                if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
+                    Map<String, Object> data = response.body().getData();
+                    setupGradesChart(num(data, "passingRate"), num(data, "avgScore"), (int) num(data, "totalGrades"));
+                }
+            }
+            @Override
+            public void onFailure(@NonNull Call<ApiResponse<Map<String, Object>>> call, @NonNull Throwable t) {
+                if (isAdded()) setupGradesChart(0, 0, 0);
+            }
+        });
+    }
+
+    private float num(Map<String, Object> data, String key) {
+        if (data == null) return 0f;
+        Object value = data.get(key);
+        return value instanceof Number ? ((Number) value).floatValue() : 0f;
     }
 
     private void verifySystemServices() {
@@ -192,41 +244,41 @@ public class ReportsFragment extends Fragment {
         return value != null ? value.toString() : "-";
     }
 
-    private void setupAttendanceChart() {
-        String[] days = {"Lun", "Mar", "Mie", "Jue", "Vie"};
+    private void setupAttendanceChart(float present, float late, float absent, float justified) {
+        String[] labels = {"Presente", "Tardanza", "Ausente", "Justificado"};
         List<BarEntry> entries = new ArrayList<>();
-        float[] values = {94f, 91f, 96f, 93f, 89f};
-        for (int i = 0; i < values.length; i++) {
-            entries.add(new BarEntry(i, values[i]));
-        }
+        entries.add(new BarEntry(0, present));
+        entries.add(new BarEntry(1, late));
+        entries.add(new BarEntry(2, absent));
+        entries.add(new BarEntry(3, justified));
 
-        BarDataSet dataSet = new BarDataSet(entries, "% Asistencia");
-        dataSet.setColor(requireContext().getColor(R.color.primary));
+        BarDataSet dataSet = new BarDataSet(entries, "Registros de asistencia");
+        dataSet.setColors(
+                requireContext().getColor(R.color.status_present),
+                requireContext().getColor(R.color.status_late),
+                requireContext().getColor(R.color.status_absent),
+                requireContext().getColor(R.color.status_justified));
         dataSet.setValueTextSize(11f);
 
         chartWeeklyAttendance.setData(new BarData(dataSet));
-        chartWeeklyAttendance.getXAxis().setValueFormatter(new IndexAxisValueFormatter(days));
+        chartWeeklyAttendance.getXAxis().setValueFormatter(new IndexAxisValueFormatter(labels));
         chartWeeklyAttendance.getXAxis().setGranularity(1f);
         chartWeeklyAttendance.getDescription().setEnabled(false);
         chartWeeklyAttendance.getAxisLeft().setAxisMinimum(0f);
-        chartWeeklyAttendance.getAxisLeft().setAxisMaximum(100f);
         chartWeeklyAttendance.getAxisRight().setEnabled(false);
         chartWeeklyAttendance.animateY(800);
         chartWeeklyAttendance.invalidate();
     }
 
-    private void setupGradesChart() {
+    private void setupGradesChart(float passingRate, float avgScore, int totalGrades) {
+        float normalizedPassing = Math.max(0f, Math.min(100f, passingRate));
         List<PieEntry> entries = new ArrayList<>();
-        entries.add(new PieEntry(18f, "AD"));
-        entries.add(new PieEntry(42f, "A"));
-        entries.add(new PieEntry(28f, "B"));
-        entries.add(new PieEntry(12f, "C"));
+        entries.add(new PieEntry(normalizedPassing, "Aprobados"));
+        entries.add(new PieEntry(100f - normalizedPassing, "Desaprobados"));
 
         PieDataSet dataSet = new PieDataSet(entries, "");
         dataSet.setColors(
-                requireContext().getColor(R.color.grade_ad),
                 requireContext().getColor(R.color.grade_a),
-                requireContext().getColor(R.color.grade_b),
                 requireContext().getColor(R.color.grade_c));
         dataSet.setValueTextSize(12f);
         dataSet.setValueTextColor(Color.WHITE);
@@ -234,31 +286,33 @@ public class ReportsFragment extends Fragment {
         chartGrades.setData(new PieData(dataSet));
         chartGrades.setUsePercentValues(true);
         chartGrades.getDescription().setEnabled(false);
-        chartGrades.setCenterText("Notas");
-        chartGrades.setHoleRadius(40f);
+        chartGrades.setCenterText(String.format(java.util.Locale.getDefault(),
+                "Promedio\n%.1f", avgScore));
+        chartGrades.setCenterTextSize(14f);
+        chartGrades.setHoleRadius(45f);
         chartGrades.animateY(800);
         chartGrades.invalidate();
     }
 
-    private void setupRiskChart() {
+    private void setupRiskChart(float attendanceRate) {
+        float normalizedRate = Math.max(0f, Math.min(100f, attendanceRate));
         List<BarEntry> entries = new ArrayList<>();
-        entries.add(new BarEntry(0f, 70f));
-        entries.add(new BarEntry(1f, 20f));
-        entries.add(new BarEntry(2f, 10f));
+        entries.add(new BarEntry(0f, normalizedRate));
+        entries.add(new BarEntry(1f, 100f - normalizedRate));
 
-        BarDataSet dataSet = new BarDataSet(entries, "Estudiantes %");
+        BarDataSet dataSet = new BarDataSet(entries, "% del total");
         dataSet.setColors(
                 requireContext().getColor(R.color.risk_low),
-                requireContext().getColor(R.color.risk_medium),
                 requireContext().getColor(R.color.risk_high));
         dataSet.setValueTextSize(11f);
 
-        String[] labels = {"Bajo", "Medio", "Alto"};
+        String[] labels = {"Asistencia", "Inasistencia"};
         chartRisk.setData(new BarData(dataSet));
         chartRisk.getXAxis().setValueFormatter(new IndexAxisValueFormatter(labels));
         chartRisk.getXAxis().setGranularity(1f);
         chartRisk.getDescription().setEnabled(false);
         chartRisk.getAxisLeft().setAxisMinimum(0f);
+        chartRisk.getAxisLeft().setAxisMaximum(100f);
         chartRisk.getAxisRight().setEnabled(false);
         chartRisk.animateX(800);
         chartRisk.invalidate();

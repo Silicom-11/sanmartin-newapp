@@ -3,7 +3,7 @@ package com.iepca.app.model;
 import com.google.gson.annotations.SerializedName;
 
 public class Institution {
-    @SerializedName("_id") private String id;
+    @SerializedName(value = "_id", alternate = {"id"}) private String id;
     private String name;
     private String code;
     private String address;

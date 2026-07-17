@@ -13,7 +13,9 @@ import com.iepca.app.R;
 import com.iepca.app.model.Justification;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * RecyclerView Adapter for Justifications list.
@@ -21,6 +23,7 @@ import java.util.List;
 public class JustificationAdapter extends RecyclerView.Adapter<JustificationAdapter.ViewHolder> {
 
     private List<Justification> items = new ArrayList<>();
+    private Map<String, String> studentNames = new HashMap<>();
     private OnActionListener listener;
     private boolean showActions;
 
@@ -37,6 +40,12 @@ public class JustificationAdapter extends RecyclerView.Adapter<JustificationAdap
 
     public void setItems(List<Justification> newItems) {
         this.items = newItems != null ? newItems : new ArrayList<>();
+        notifyDataSetChanged();
+    }
+
+    /** studentId -> display name */
+    public void setStudentNames(Map<String, String> names) {
+        this.studentNames = names != null ? names : new HashMap<>();
         notifyDataSetChanged();
     }
 
@@ -75,16 +84,17 @@ public class JustificationAdapter extends RecyclerView.Adapter<JustificationAdap
         }
 
         void bind(Justification j) {
-            String studentName = j.getStudent() != null ? j.getStudent().getFullName() : "Estudiante";
+            String studentName = j.getStudentId() != null ? studentNames.get(j.getStudentId()) : null;
+            if (studentName == null) studentName = "Estudiante";
             tvStudentName.setText(studentName);
             tvReason.setText("Motivo: " + (j.getReason() != null ? j.getReason() : "--"));
-            String dates = j.getDates() != null && !j.getDates().isEmpty() ? j.getDates().get(0) : "";
+            String dates = j.getDates() != null && !j.getDates().isEmpty() ? formatDate(j.getDates().get(0)) : "";
             tvDates.setText(dates);
-            String statusStr = j.getStatus() != null ? j.getStatus().name() : "PENDIENTE";
+            String statusStr = j.getStatus() != null ? j.getStatus().getLabel() : "Pendiente";
             tvStatus.setText(statusStr);
 
             if (showActions && j.getStatus() != null
-                    && j.getStatus() == com.iepca.app.model.enums.JustificationStatus.PENDIENTE) {
+                    && j.getStatus() == com.iepca.app.model.enums.JustificationStatus.PENDING) {
                 layoutActions.setVisibility(View.VISIBLE);
                 btnApprove.setOnClickListener(v -> {
                     if (listener != null) listener.onApprove(j);
@@ -99,6 +109,11 @@ public class JustificationAdapter extends RecyclerView.Adapter<JustificationAdap
             itemView.setOnClickListener(v -> {
                 if (listener != null) listener.onItemClick(j);
             });
+        }
+
+        private String formatDate(String raw) {
+            if (raw == null) return "";
+            return raw.length() >= 10 ? raw.substring(0, 10) : raw;
         }
     }
 }

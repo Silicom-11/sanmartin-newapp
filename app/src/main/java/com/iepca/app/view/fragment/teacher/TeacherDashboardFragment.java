@@ -11,6 +11,7 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.iepca.app.R;
 import com.iepca.app.config.RetrofitClient;
@@ -21,8 +22,12 @@ import com.iepca.app.model.ApiResponse;
 import com.iepca.app.model.Course;
 import com.iepca.app.util.UIUtils;
 import com.iepca.app.view.adapter.CourseAdapter;
+import com.iepca.app.view.fragment.shared.NotificationsFragment;
 
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import retrofit2.Call;
@@ -31,9 +36,10 @@ import retrofit2.Response;
 
 public class TeacherDashboardFragment extends Fragment {
 
-    private TextView tvWelcome, tvTodaySummary;
+    private TextView tvWelcome, tvTodaySummary, tvTodayDate, tvCoursesSummary, tvNoCourses;
     private RecyclerView rvCourses;
-    private View btnTakeAttendance, btnAddGrades;
+    private View btnTakeAttendance, btnAddGrades, btnNotifications;
+    private SwipeRefreshLayout swipeRefresh;
     private CourseDao courseDao;
     private DashboardDao dashboardDao;
     private CourseAdapter courseAdapter;
@@ -55,21 +61,31 @@ public class TeacherDashboardFragment extends Fragment {
 
         tvWelcome = view.findViewById(R.id.tvWelcome);
         tvTodaySummary = view.findViewById(R.id.tvTodaySummary);
+        tvTodayDate = view.findViewById(R.id.tvTodayDate);
+        tvCoursesSummary = view.findViewById(R.id.tvCoursesSummary);
+        tvNoCourses = view.findViewById(R.id.tvNoCourses);
         rvCourses = view.findViewById(R.id.rvCourses);
         btnTakeAttendance = view.findViewById(R.id.btnTakeAttendance);
         btnAddGrades = view.findViewById(R.id.btnAddGrades);
+        btnNotifications = view.findViewById(R.id.btnNotifications);
+        swipeRefresh = view.findViewById(R.id.swipeRefresh);
 
         tvWelcome.setText("Bienvenido, " + session.getUserName());
+        tvTodayDate.setText(new SimpleDateFormat("dd\nMMM", new Locale("es")).format(new Date()));
 
-        courseAdapter = new CourseAdapter(course -> {
-            UIUtils.showToast(requireContext(), "Curso: " + course.getName());
-        });
+        courseAdapter = new CourseAdapter(course -> navigateTo(new GradesFormFragment()));
         rvCourses.setLayoutManager(new LinearLayoutManager(requireContext()));
         rvCourses.setAdapter(courseAdapter);
 
         btnTakeAttendance.setOnClickListener(v -> navigateTo(new AttendanceFragment()));
         btnAddGrades.setOnClickListener(v -> navigateTo(new GradesFormFragment()));
+        btnNotifications.setOnClickListener(v -> navigateTo(new NotificationsFragment()));
+        swipeRefresh.setOnRefreshListener(this::refreshAll);
 
+        refreshAll();
+    }
+
+    private void refreshAll() {
         loadMyCourses();
         loadDashboard();
     }
@@ -80,13 +96,24 @@ public class TeacherDashboardFragment extends Fragment {
             public void onResponse(@NonNull Call<ApiResponse<List<Course>>> call,
                                    @NonNull Response<ApiResponse<List<Course>>> response) {
                 if (!isAdded()) return;
+                swipeRefresh.setRefreshing(false);
                 if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
-                    courseAdapter.setItems(response.body().getData());
+                    List<Course> courses = response.body().getData();
+                    courseAdapter.setItems(courses);
+                    int count = courses != null ? courses.size() : 0;
+                    tvCoursesSummary.setText(count == 1
+                            ? "1 curso asignado"
+                            : count + " cursos asignados");
+                    boolean empty = count == 0;
+                    tvNoCourses.setVisibility(empty ? View.VISIBLE : View.GONE);
+                    rvCourses.setVisibility(empty ? View.GONE : View.VISIBLE);
                 }
             }
             @Override
             public void onFailure(@NonNull Call<ApiResponse<List<Course>>> call, @NonNull Throwable t) {
-                if (isAdded()) UIUtils.showToast(requireContext(), "Error cargando cursos");
+                if (!isAdded()) return;
+                swipeRefresh.setRefreshing(false);
+                UIUtils.showToast(requireContext(), "Error cargando cursos");
             }
         });
     }
