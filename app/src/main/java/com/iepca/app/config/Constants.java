@@ -41,6 +41,12 @@ public final class Constants {
     public static final long LOCATION_FASTEST_INTERVAL_MS = 15_000;
     public static final float LOCATION_MIN_DISTANCE_M = 10f;
     public static final int LOCATION_NOTIFICATION_ID = 1001;
+    public static final long GPS_MAP_REFRESH_MS = 30_000; // 30s auto-refresh for maps
+
+    // School geofence (IEP Continental Americano - Pichanaki)
+    public static final double SCHOOL_LAT = -10.9279;
+    public static final double SCHOOL_LON = -74.8723;
+    public static final double SCHOOL_RADIUS_M = 200;
 
     // Attendance Status
     public static final String ATTENDANCE_PRESENT = "present";

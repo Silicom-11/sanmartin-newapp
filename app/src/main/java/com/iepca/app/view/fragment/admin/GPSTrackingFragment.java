@@ -1,7 +1,10 @@
 package com.iepca.app.view.fragment.admin;
 
+import android.graphics.Color;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -18,6 +21,7 @@ import androidx.fragment.app.Fragment;
 
 import com.google.android.material.button.MaterialButton;
 import com.iepca.app.R;
+import com.iepca.app.config.Constants;
 import com.iepca.app.config.RetrofitClient;
 import com.iepca.app.dao.LocationDao;
 import com.iepca.app.model.ApiResponse;
@@ -28,6 +32,7 @@ import org.osmdroid.util.BoundingBox;
 import org.osmdroid.util.GeoPoint;
 import org.osmdroid.views.MapView;
 import org.osmdroid.views.overlay.Marker;
+import org.osmdroid.views.overlay.Polygon;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -37,15 +42,9 @@ import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 
-/**
- * Live GPS monitor for the administrator (RF13).
- *
- * Shows every student's last known position on an OpenStreetMap view
- * (no API key required) with online/offline markers.
- */
 public class GPSTrackingFragment extends Fragment {
 
-    private static final GeoPoint PICHANAKI = new GeoPoint(-10.9279, -74.8723);
+    private static final GeoPoint PICHANAKI = new GeoPoint(Constants.SCHOOL_LAT, Constants.SCHOOL_LON);
 
     private Spinner spinnerStudent;
     private TextView tvStatus;
@@ -57,6 +56,11 @@ public class GPSTrackingFragment extends Fragment {
     private MapView mapView;
     private LocationDao locationDao;
     private List<Location> studentLocations = new ArrayList<>();
+    private final Handler refreshHandler = new Handler(Looper.getMainLooper());
+    private final Runnable refreshRunnable = () -> {
+        loadStudentLocations();
+        scheduleRefresh();
+    };
 
     @Nullable
     @Override
@@ -93,12 +97,19 @@ public class GPSTrackingFragment extends Fragment {
     public void onResume() {
         super.onResume();
         if (mapView != null) mapView.onResume();
+        scheduleRefresh();
     }
 
     @Override
     public void onPause() {
         super.onPause();
         if (mapView != null) mapView.onPause();
+        refreshHandler.removeCallbacks(refreshRunnable);
+    }
+
+    private void scheduleRefresh() {
+        refreshHandler.removeCallbacks(refreshRunnable);
+        refreshHandler.postDelayed(refreshRunnable, Constants.GPS_MAP_REFRESH_MS);
     }
 
     private void loadStudentLocations() {
@@ -156,27 +167,56 @@ public class GPSTrackingFragment extends Fragment {
         });
     }
 
+    private int getMarkerColor(Location loc) {
+        if (!loc.isOnline()) return requireContext().getColor(R.color.warning);
+        if (Boolean.FALSE.equals(loc.getInsidePerimeter())) return requireContext().getColor(R.color.error);
+        return requireContext().getColor(R.color.success);
+    }
+
     private Marker buildMarker(Location loc, String title) {
         Marker marker = new Marker(mapView);
         marker.setPosition(new GeoPoint(loc.getLatitude(), loc.getLongitude()));
         marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM);
         marker.setTitle(title);
-        marker.setSnippet(loc.isOnline() ? "GPS activo" : "Última ubicación");
+
+        String snippet;
+        if (!loc.isOnline()) {
+            snippet = "Offline";
+        } else if (Boolean.FALSE.equals(loc.getInsidePerimeter())) {
+            snippet = "FUERA del perimetro";
+        } else {
+            snippet = "Dentro del perimetro";
+        }
+        if (loc.getDistanceToSchool() != null) {
+            snippet += String.format(Locale.US, " (%.0fm)", loc.getDistanceToSchool());
+        }
+        marker.setSnippet(snippet);
 
         Drawable icon = ContextCompat.getDrawable(requireContext(),
                 org.osmdroid.library.R.drawable.marker_default);
         if (icon != null) {
             Drawable tinted = DrawableCompat.wrap(icon.mutate());
-            DrawableCompat.setTint(tinted, requireContext().getColor(
-                    loc.isOnline() ? R.color.success : R.color.warning));
+            DrawableCompat.setTint(tinted, getMarkerColor(loc));
             marker.setIcon(tinted);
         }
         return marker;
     }
 
+    private Polygon buildSchoolPerimeter() {
+        Polygon circle = new Polygon(mapView);
+        circle.setPoints(Polygon.pointsAsCircle(PICHANAKI, Constants.SCHOOL_RADIUS_M));
+        circle.setStrokeColor(Color.argb(180, 33, 150, 243));
+        circle.setStrokeWidth(2f);
+        circle.setFillColor(Color.argb(40, 33, 150, 243));
+        circle.setTitle("IEP Continental Americano");
+        circle.setSnippet("Perimetro escolar (" + (int) Constants.SCHOOL_RADIUS_M + "m)");
+        return circle;
+    }
+
     private void showAllMarkers() {
         if (mapView == null) return;
         mapView.getOverlays().clear();
+        mapView.getOverlays().add(buildSchoolPerimeter());
 
         if (studentLocations == null || studentLocations.isEmpty()) {
             mapView.getController().setZoom(15.0);
@@ -206,7 +246,8 @@ public class GPSTrackingFragment extends Fragment {
     private void showSingleMarker(Location loc) {
         if (mapView == null || !isValidLocation(loc)) return;
         mapView.getOverlays().clear();
-        String title = loc.getStudent() != null ? loc.getStudent().getFullName() : "Ubicación actual";
+        mapView.getOverlays().add(buildSchoolPerimeter());
+        String title = loc.getStudent() != null ? loc.getStudent().getFullName() : "Ubicacion actual";
         Marker marker = buildMarker(loc, title);
         marker.showInfoWindow();
         mapView.getOverlays().add(marker);
@@ -218,23 +259,41 @@ public class GPSTrackingFragment extends Fragment {
     private void updateSummaryForAll() {
         int total = studentLocations != null ? studentLocations.size() : 0;
         int online = 0;
+        int inside = 0;
+        int outside = 0;
         if (studentLocations != null) {
-            for (Location loc : studentLocations) if (loc.isOnline()) online++;
+            for (Location loc : studentLocations) {
+                if (loc.isOnline()) online++;
+                if (Boolean.TRUE.equals(loc.getInsidePerimeter())) inside++;
+                if (Boolean.FALSE.equals(loc.getInsidePerimeter())) outside++;
+            }
         }
-        tvStatus.setText("Online " + online + "/" + total);
+        tvStatus.setText("Online " + online + "/" + total
+                + " | Perimetro: " + inside + " dentro, " + outside + " fuera");
         tvBattery.setText(total > 0 ? total + " GPS" : "--");
-        tvLastUpdate.setText(total > 0 ? "Panel actualizado" : "--");
+        tvLastUpdate.setText(total > 0 ? "Auto-refresh cada 30s" : "--");
         tvCoordinates.setText("Coordenadas: " + total + " estudiantes monitoreados");
-        tvAccuracy.setText("Precisión: seleccione un estudiante para ver detalle");
+        tvAccuracy.setText("Seleccione un estudiante para ver detalle");
     }
 
     private void updateSummaryForLocation(Location loc) {
-        tvStatus.setText(loc.isOnline() ? "En línea" : "Offline");
+        String status = loc.isOnline() ? "En linea" : "Offline";
+        if (loc.isOnline() && Boolean.FALSE.equals(loc.getInsidePerimeter())) {
+            status += " - FUERA del perimetro";
+        } else if (loc.isOnline() && Boolean.TRUE.equals(loc.getInsidePerimeter())) {
+            status += " - Dentro del perimetro";
+        }
+        tvStatus.setText(status);
         tvLastUpdate.setText(shortTimestamp(loc.getTimestamp()));
         tvBattery.setText((int) loc.getBattery() + "%");
-        tvCoordinates.setText(String.format(Locale.US, "Coordenadas: %.5f, %.5f",
-                loc.getLatitude(), loc.getLongitude()));
-        tvAccuracy.setText(String.format(Locale.US, "Precisión: %.1f m | Velocidad: %.1f m/s",
+
+        String coords = String.format(Locale.US, "Coordenadas: %.5f, %.5f",
+                loc.getLatitude(), loc.getLongitude());
+        if (loc.getDistanceToSchool() != null) {
+            coords += String.format(Locale.US, " | Dist: %.0fm", loc.getDistanceToSchool());
+        }
+        tvCoordinates.setText(coords);
+        tvAccuracy.setText(String.format(Locale.US, "Precision: %.1f m | Velocidad: %.1f m/s",
                 loc.getAccuracy(), loc.getSpeed()));
     }
 
@@ -242,8 +301,8 @@ public class GPSTrackingFragment extends Fragment {
         tvStatus.setText("Sin datos");
         tvLastUpdate.setText("--");
         tvBattery.setText("--");
-        tvCoordinates.setText("Coordenadas: esperando señal GPS");
-        tvAccuracy.setText("Precisión: --");
+        tvCoordinates.setText("Coordenadas: esperando senal GPS");
+        tvAccuracy.setText("Precision: --");
     }
 
     private boolean isValidLocation(Location loc) {

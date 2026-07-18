@@ -19,6 +19,8 @@ public class Location {
     private String timestamp;
     private String createdAt;
     private String clientTimestamp;
+    private Boolean insidePerimeter;
+    private Double distanceToSchool;
     private Student student;
 
     public String getId() { return id; }
@@ -36,6 +38,8 @@ public class Location {
         if (createdAt != null) return createdAt;
         return clientTimestamp != null ? clientTimestamp : "--";
     }
+    public Boolean getInsidePerimeter() { return insidePerimeter; }
+    public Double getDistanceToSchool() { return distanceToSchool; }
     public Student getStudent() { return student; }
 
     public void setLatitude(double l) { this.latitude = l; }

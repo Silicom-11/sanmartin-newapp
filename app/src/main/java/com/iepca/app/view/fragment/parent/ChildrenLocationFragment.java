@@ -2,6 +2,8 @@ package com.iepca.app.view.fragment.parent;
 
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -18,6 +20,7 @@ import androidx.fragment.app.Fragment;
 
 import com.google.android.material.button.MaterialButton;
 import com.iepca.app.R;
+import com.iepca.app.config.Constants;
 import com.iepca.app.config.RetrofitClient;
 import com.iepca.app.dao.LocationDao;
 import com.iepca.app.dao.StudentDao;
@@ -38,13 +41,9 @@ import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 
-/**
- * Parent view of their children's live GPS position (RF13),
- * rendered on OpenStreetMap without external API keys.
- */
 public class ChildrenLocationFragment extends Fragment {
 
-    private static final GeoPoint PICHANAKI = new GeoPoint(-10.9279, -74.8723);
+    private static final GeoPoint PICHANAKI = new GeoPoint(Constants.SCHOOL_LAT, Constants.SCHOOL_LON);
 
     private Spinner spinnerChild;
     private TextView tvChildStatus;
@@ -58,6 +57,11 @@ public class ChildrenLocationFragment extends Fragment {
     private StudentDao studentDao;
     private List<Student> children = new ArrayList<>();
     private String selectedChildId;
+    private final Handler refreshHandler = new Handler(Looper.getMainLooper());
+    private final Runnable refreshRunnable = () -> {
+        if (selectedChildId != null) loadChildLocation(selectedChildId);
+        scheduleRefresh();
+    };
 
     @Nullable
     @Override
@@ -97,12 +101,19 @@ public class ChildrenLocationFragment extends Fragment {
     public void onResume() {
         super.onResume();
         if (mapView != null) mapView.onResume();
+        scheduleRefresh();
     }
 
     @Override
     public void onPause() {
         super.onPause();
         if (mapView != null) mapView.onPause();
+        refreshHandler.removeCallbacks(refreshRunnable);
+    }
+
+    private void scheduleRefresh() {
+        refreshHandler.removeCallbacks(refreshRunnable);
+        refreshHandler.postDelayed(refreshRunnable, Constants.GPS_MAP_REFRESH_MS);
     }
 
     private void loadChildren() {
@@ -178,9 +189,15 @@ public class ChildrenLocationFragment extends Fragment {
             public void onFailure(@NonNull Call<ApiResponse<Location>> call, @NonNull Throwable t) {
                 if (!isAdded()) return;
                 updateEmptyState();
-                UIUtils.showToast(requireContext(), "Error cargando ubicación");
+                UIUtils.showToast(requireContext(), "Error cargando ubicacion");
             }
         });
+    }
+
+    private int getMarkerColor(Location loc) {
+        if (!loc.isOnline()) return requireContext().getColor(R.color.warning);
+        if (Boolean.FALSE.equals(loc.getInsidePerimeter())) return requireContext().getColor(R.color.error);
+        return requireContext().getColor(R.color.success);
     }
 
     private void renderLocation(Location loc) {
@@ -192,14 +209,22 @@ public class ChildrenLocationFragment extends Fragment {
             marker.setPosition(point);
             marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM);
             marker.setTitle(loc.getStudent() != null ? loc.getStudent().getFullName() : "Estudiante");
-            marker.setSnippet(loc.isOnline() ? "GPS activo" : "Última ubicación");
+
+            String snippet;
+            if (!loc.isOnline()) {
+                snippet = "Offline";
+            } else if (Boolean.FALSE.equals(loc.getInsidePerimeter())) {
+                snippet = "FUERA del perimetro escolar";
+            } else {
+                snippet = "Dentro del perimetro escolar";
+            }
+            marker.setSnippet(snippet);
 
             Drawable icon = ContextCompat.getDrawable(requireContext(),
                     org.osmdroid.library.R.drawable.marker_default);
             if (icon != null) {
                 Drawable tinted = DrawableCompat.wrap(icon.mutate());
-                DrawableCompat.setTint(tinted, requireContext().getColor(
-                        loc.isOnline() ? R.color.success : R.color.warning));
+                DrawableCompat.setTint(tinted, getMarkerColor(loc));
                 marker.setIcon(tinted);
             }
             marker.showInfoWindow();
@@ -210,22 +235,40 @@ public class ChildrenLocationFragment extends Fragment {
             mapView.invalidate();
         }
 
-        tvChildStatus.setText(loc.isOnline() ? "Estado: en línea" : "Estado: desconectado");
-        tvChildLastSeen.setText("Última conexión: " + shortTimestamp(loc.getTimestamp()));
+        tvChildStatus.setText(loc.isOnline() ? "Estado: en linea" : "Estado: desconectado");
+        tvChildLastSeen.setText("Ultima conexion: " + shortTimestamp(loc.getTimestamp()));
         tvChildCoordinates.setText(String.format(Locale.US, "Coordenadas: %.5f, %.5f",
                 loc.getLatitude(), loc.getLongitude()));
-        tvChildAccuracy.setText(String.format(Locale.US, "Precisión GPS: %.1f m", loc.getAccuracy()));
-        tvChildSafety.setText(loc.isOnline()
-                ? "Semáforo GPS: VERDE - ubicación actualizada"
-                : "Semáforo GPS: AMARILLO - revisar última conexión");
+
+        String accuracyText = String.format(Locale.US, "Precision GPS: %.1f m", loc.getAccuracy());
+        if (loc.getDistanceToSchool() != null) {
+            accuracyText += String.format(Locale.US, " | Dist. colegio: %.0fm", loc.getDistanceToSchool());
+        }
+        tvChildAccuracy.setText(accuracyText);
+
+        tvChildSafety.setText(getSemaforoText(loc));
+    }
+
+    private String getSemaforoText(Location loc) {
+        if (!loc.isOnline()) {
+            return "Semaforo GPS: AMARILLO - sin conexion, revisar ultima ubicacion";
+        }
+        if (Boolean.FALSE.equals(loc.getInsidePerimeter())) {
+            String text = "Semaforo GPS: ROJO - FUERA del perimetro escolar";
+            if (loc.getDistanceToSchool() != null) {
+                text += String.format(Locale.US, " (%.0fm del colegio)", loc.getDistanceToSchool());
+            }
+            return text;
+        }
+        return "Semaforo GPS: VERDE - dentro del perimetro escolar";
     }
 
     private void updateEmptyState() {
         tvChildStatus.setText("Estado: --");
-        tvChildLastSeen.setText("Última conexión: --");
-        tvChildCoordinates.setText("Coordenadas: esperando señal GPS");
-        tvChildAccuracy.setText("Precisión GPS: --");
-        tvChildSafety.setText("Semáforo GPS: esperando ubicación");
+        tvChildLastSeen.setText("Ultima conexion: --");
+        tvChildCoordinates.setText("Coordenadas: esperando senal GPS");
+        tvChildAccuracy.setText("Precision GPS: --");
+        tvChildSafety.setText("Semaforo GPS: esperando ubicacion");
         if (mapView != null) {
             mapView.getOverlays().clear();
             mapView.getController().setZoom(15.0);

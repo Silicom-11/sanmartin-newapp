@@ -46,11 +46,20 @@ import com.iepca.app.view.fragment.student.StudentGradesFragment;
 import com.iepca.app.view.fragment.shared.CalendarFragment;
 import com.iepca.app.view.fragment.shared.ProfileFragment;
 import com.iepca.app.view.fragment.shared.NotificationsFragment;
+import com.iepca.app.dao.LocationDao;
+import com.iepca.app.model.ApiResponse;
 import com.iepca.app.service.LocationTrackingService;
 import com.iepca.app.util.UIUtils;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.HashMap;
+import java.util.Map;
+
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
 
 /**
  * Main Activity - acts as the Navigation Controller (MVC pattern).
@@ -256,6 +265,25 @@ public class MainActivity extends AppCompatActivity
     }
 
     public void logout() {
+        if (session.isStudent()) {
+            try {
+                LocationDao locationDao = RetrofitClient.createService(this, LocationDao.class);
+                Map<String, Object> data = new HashMap<>();
+                data.put("sessionStatus", "offline");
+                locationDao.logoutLocation(data).enqueue(new Callback<ApiResponse<Void>>() {
+                    @Override
+                    public void onResponse(Call<ApiResponse<Void>> c, Response<ApiResponse<Void>> r) {
+                        LOG.info("GPS logout notificado al backend");
+                    }
+                    @Override
+                    public void onFailure(Call<ApiResponse<Void>> c, Throwable t) {
+                        LOG.warn("No se pudo notificar GPS logout: {}", t.getMessage());
+                    }
+                });
+            } catch (Exception e) {
+                LOG.warn("Error notificando GPS logout: {}", e.getMessage());
+            }
+        }
         stopService(new Intent(this, LocationTrackingService.class));
         session.clearSession();
         RetrofitClient.resetClient();

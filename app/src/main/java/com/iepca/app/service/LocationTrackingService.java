@@ -28,6 +28,7 @@ import com.iepca.app.config.App;
 import com.iepca.app.config.Constants;
 import com.iepca.app.config.RetrofitClient;
 import com.iepca.app.dao.LocationDao;
+import com.iepca.app.BuildConfig;
 import com.iepca.app.model.ApiResponse;
 import com.iepca.app.model.Location;
 import com.iepca.app.view.activity.MainActivity;
@@ -119,7 +120,7 @@ public class LocationTrackingService extends Service {
         data.put("networkType", getNetworkType());
         data.put("platform", "android");
         data.put("deviceId", Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID));
-        data.put("appVersion", "1.0.0");
+        data.put("appVersion", BuildConfig.VERSION_NAME);
         data.put("sessionStatus", "online");
         data.put("updateType", "periodic");
 
@@ -182,8 +183,28 @@ public class LocationTrackingService extends Service {
         if (fusedClient != null && locationCallback != null) {
             fusedClient.removeLocationUpdates(locationCallback);
         }
+        notifyBackendOffline();
         LOG.info("LocationTrackingService destroyed");
         super.onDestroy();
+    }
+
+    private void notifyBackendOffline() {
+        try {
+            Map<String, Object> data = new HashMap<>();
+            data.put("sessionStatus", "offline");
+            locationDao.logoutLocation(data).enqueue(new Callback<ApiResponse<Void>>() {
+                @Override
+                public void onResponse(Call<ApiResponse<Void>> c, Response<ApiResponse<Void>> r) {
+                    LOG.info("Backend notificado: GPS offline");
+                }
+                @Override
+                public void onFailure(Call<ApiResponse<Void>> c, Throwable t) {
+                    LOG.warn("No se pudo notificar GPS offline: {}", t.getMessage());
+                }
+            });
+        } catch (Exception e) {
+            LOG.warn("Error notificando offline: {}", e.getMessage());
+        }
     }
 
     @Nullable
