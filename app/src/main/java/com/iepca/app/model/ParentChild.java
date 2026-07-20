@@ -1,13 +1,15 @@
 package com.iepca.app.model;
 
 public class ParentChild {
-    private String studentId;
+    private String student;
     private String relationship;
-    private boolean isPrimary;
-    private Student student;
+    private boolean isPrimaryContact;
+    private boolean canPickUp;
+    private boolean isEmergencyContact;
 
-    public String getStudentId() { return studentId; }
+    public String getStudentId() { return student; }
     public String getRelationship() { return relationship; }
-    public boolean isPrimary() { return isPrimary; }
-    public Student getStudent() { return student; }
+    public boolean isPrimaryContact() { return isPrimaryContact; }
+    public boolean isCanPickUp() { return canPickUp; }
+    public boolean isEmergencyContact() { return isEmergencyContact; }
 }

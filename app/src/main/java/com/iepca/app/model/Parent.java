@@ -11,7 +11,7 @@ public class Parent {
     private String dni;
     private String phone;
     private String secondaryPhone;
-    private String address;
+    private Object address;
     private String occupation;
     private String workplace;
     private List<ParentChild> children;
@@ -30,6 +30,11 @@ public class Parent {
     public boolean isActive() { return isActive; }
     public String getEmail() { return email; }
     public String getFullName() { return firstName + " " + lastName; }
+
+    public String getAddressString() {
+        if (address == null) return null;
+        return address.toString();
+    }
 
     public void setId(String id) { this.id = id; }
     public void setFirstName(String f) { this.firstName = f; }

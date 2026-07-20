@@ -1,7 +1,9 @@
 package com.iepca.app.view.fragment.admin;
 
+import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.drawable.Drawable;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -53,9 +55,11 @@ public class GPSTrackingFragment extends Fragment {
     private TextView tvCoordinates;
     private TextView tvAccuracy;
     private MaterialButton btnRefreshGps;
+    private MaterialButton btnOpenGoogleMaps;
     private MapView mapView;
     private LocationDao locationDao;
     private List<Location> studentLocations = new ArrayList<>();
+    private Location selectedLocation;
     private final Handler refreshHandler = new Handler(Looper.getMainLooper());
     private final Runnable refreshRunnable = () -> {
         loadStudentLocations();
@@ -82,6 +86,8 @@ public class GPSTrackingFragment extends Fragment {
         tvAccuracy = view.findViewById(R.id.tvAccuracy);
         btnRefreshGps = view.findViewById(R.id.btnRefreshGps);
         btnRefreshGps.setOnClickListener(v -> loadStudentLocations());
+        btnOpenGoogleMaps = view.findViewById(R.id.btnOpenGoogleMaps);
+        btnOpenGoogleMaps.setOnClickListener(v -> openInGoogleMaps());
 
         mapView = view.findViewById(R.id.map);
         mapView.setTileSource(org.osmdroid.tileprovider.tilesource.TileSourceFactory.MAPNIK);
@@ -152,11 +158,15 @@ public class GPSTrackingFragment extends Fragment {
             @Override
             public void onItemSelected(AdapterView<?> parent, View v, int pos, long id) {
                 if (pos == 0) {
+                    selectedLocation = null;
+                    btnOpenGoogleMaps.setVisibility(View.GONE);
                     showAllMarkers();
                     updateSummaryForAll();
                     return;
                 }
                 Location loc = studentLocations.get(pos - 1);
+                selectedLocation = loc;
+                btnOpenGoogleMaps.setVisibility(View.VISIBLE);
                 showSingleMarker(loc);
                 updateSummaryForLocation(loc);
             }
@@ -313,5 +323,27 @@ public class GPSTrackingFragment extends Fragment {
     private String shortTimestamp(String timestamp) {
         if (timestamp == null || timestamp.equals("--")) return "--";
         return timestamp.length() > 19 ? timestamp.substring(0, 19).replace('T', ' ') : timestamp;
+    }
+
+    private void openInGoogleMaps() {
+        if (selectedLocation == null || !isValidLocation(selectedLocation)) {
+            UIUtils.showToast(requireContext(), "Seleccione un estudiante con ubicacion");
+            return;
+        }
+        String name = selectedLocation.getStudent() != null
+                ? selectedLocation.getStudent().getFullName() : "Estudiante";
+        String uri = String.format(Locale.US, "geo:0,0?q=%.6f,%.6f(%s)",
+                selectedLocation.getLatitude(), selectedLocation.getLongitude(),
+                Uri.encode(name));
+        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(uri));
+        intent.setPackage("com.google.android.apps.maps");
+        if (intent.resolveActivity(requireContext().getPackageManager()) != null) {
+            startActivity(intent);
+        } else {
+            String webUrl = String.format(Locale.US,
+                    "https://www.google.com/maps/search/?api=1&query=%.6f,%.6f",
+                    selectedLocation.getLatitude(), selectedLocation.getLongitude());
+            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(webUrl)));
+        }
     }
 }

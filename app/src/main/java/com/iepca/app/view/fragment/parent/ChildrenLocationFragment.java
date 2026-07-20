@@ -1,6 +1,8 @@
 package com.iepca.app.view.fragment.parent;
 
+import android.content.Intent;
 import android.graphics.drawable.Drawable;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -52,11 +54,13 @@ public class ChildrenLocationFragment extends Fragment {
     private TextView tvChildAccuracy;
     private TextView tvChildSafety;
     private MaterialButton btnRefreshChildLocation;
+    private MaterialButton btnOpenGoogleMaps;
     private MapView mapView;
     private LocationDao locationDao;
     private StudentDao studentDao;
     private List<Student> children = new ArrayList<>();
     private String selectedChildId;
+    private Location lastRenderedLocation;
     private final Handler refreshHandler = new Handler(Looper.getMainLooper());
     private final Runnable refreshRunnable = () -> {
         if (selectedChildId != null) loadChildLocation(selectedChildId);
@@ -86,6 +90,8 @@ public class ChildrenLocationFragment extends Fragment {
         btnRefreshChildLocation.setOnClickListener(v -> {
             if (selectedChildId != null) loadChildLocation(selectedChildId);
         });
+        btnOpenGoogleMaps = view.findViewById(R.id.btnOpenGoogleMaps);
+        btnOpenGoogleMaps.setOnClickListener(v -> openInGoogleMaps());
 
         mapView = view.findViewById(R.id.map);
         mapView.setTileSource(org.osmdroid.tileprovider.tilesource.TileSourceFactory.MAPNIK);
@@ -201,6 +207,8 @@ public class ChildrenLocationFragment extends Fragment {
     }
 
     private void renderLocation(Location loc) {
+        lastRenderedLocation = loc;
+        btnOpenGoogleMaps.setVisibility(View.VISIBLE);
         if (mapView != null) {
             mapView.getOverlays().clear();
             GeoPoint point = new GeoPoint(loc.getLatitude(), loc.getLongitude());
@@ -285,5 +293,27 @@ public class ChildrenLocationFragment extends Fragment {
     private String shortTimestamp(String timestamp) {
         if (timestamp == null || timestamp.equals("--")) return "--";
         return timestamp.length() > 19 ? timestamp.substring(0, 19).replace('T', ' ') : timestamp;
+    }
+
+    private void openInGoogleMaps() {
+        if (lastRenderedLocation == null || !isValidLocation(lastRenderedLocation)) {
+            UIUtils.showToast(requireContext(), "No hay ubicacion disponible");
+            return;
+        }
+        String name = lastRenderedLocation.getStudent() != null
+                ? lastRenderedLocation.getStudent().getFullName() : "Estudiante";
+        String uri = String.format(Locale.US, "geo:0,0?q=%.6f,%.6f(%s)",
+                lastRenderedLocation.getLatitude(), lastRenderedLocation.getLongitude(),
+                Uri.encode(name));
+        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(uri));
+        intent.setPackage("com.google.android.apps.maps");
+        if (intent.resolveActivity(requireContext().getPackageManager()) != null) {
+            startActivity(intent);
+        } else {
+            String webUrl = String.format(Locale.US,
+                    "https://www.google.com/maps/search/?api=1&query=%.6f,%.6f",
+                    lastRenderedLocation.getLatitude(), lastRenderedLocation.getLongitude());
+            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(webUrl)));
+        }
     }
 }

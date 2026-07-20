@@ -173,5 +173,20 @@
             app:cornerRadius="14dp"
             app:icon="@drawable/ic_location"
             app:iconTint="@color/primary" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnOpenGoogleMaps"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:layout_marginTop="8dp"
+            android:text="Ver en Google Maps"
+            android:textAllCaps="false"
+            android:textColor="@android:color/white"
+            android:textStyle="bold"
+            android:visibility="gone"
+            app:backgroundTint="@color/primary"
+            app:cornerRadius="14dp"
+            app:icon="@drawable/ic_map"
+            app:iconTint="@android:color/white" />
     </LinearLayout>
 </ScrollView>
